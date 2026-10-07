@@ -16,34 +16,24 @@ model Estudante {
   telefone        String   @db.VarChar(20)
   data_cadastro   String?
   foto            String
-  id_plano        Int
   status          DateTime @default(now())
+  agendamentos     Agendamento[]
   senha           String?  @db.VarChar(255)
-  cliente_id      String?  @unique @db.Uuid
-  @@map("alunos")
+  @@map("estudantes")
 }
 
-model Treino {
-  id_treino    Int      @id @default(autoincrement())
-  id_estudante Int
-  id_instrutor Int
-  objetivo     String   @db.VarChar(100)
-  observacoes  String   @db.VarChar(200)
-  data_entrada DateTime @default(now())
-  data_saida   DateTime @updatedAt
-  @@map("treinos")
-}
-
-model Instrutor {
-  id_instrutor  Int     @id @default(autoincrement())
-  nome          String  @db.VarChar(30)
-  email         String  @db.VarChar(40)
-  senha         String  @db.VarChar(255)
-  telefone      String   @db.VarChar(20)
-  especialidade String  @db.VarChar(50)
-  ativo         Boolean @default(true)
-  foto          String
-  @@map("instrutores")
+model Operador {
+  id_estudante    Int      @id @default(autoincrement())
+  nome            String   @db.VarChar(30)
+  data_nascimento Int      @db.SmallInt
+  cpf             String   @db.VarChar(14)
+  email           String   @db.VarChar(40)
+  telefone        String   @db.VarChar(20)
+  data_cadastro   String?
+  status          DateTime @default(now())
+  agendamentos     Agendamento[]
+  senha           String?  @db.VarChar(255)
+  @@map("operadores")
 }
 
 model Plano {
