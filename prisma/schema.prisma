@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Estudante {
+  id_estudante    Int      @id @default(autoincrement())
+  nome            String   @db.VarChar(30)
+  data_nascimento Int      @db.SmallInt
+  cpf             String   @db.VarChar(14)
+  email           String   @db.VarChar(40)
+  telefone        String   @db.VarChar(20)
+  data_cadastro   String?
+  foto            String
+  id_plano        Int
+  status          DateTime @default(now())
+  senha           String?  @db.VarChar(255)
+  cliente_id      String?  @unique @db.Uuid
+  @@map("alunos")
+}
+
+model Treino {
+  id_treino    Int      @id @default(autoincrement())
+  id_estudante Int
+  id_instrutor Int
+  objetivo     String   @db.VarChar(100)
+  observacoes  String   @db.VarChar(200)
+  data_entrada DateTime @default(now())
+  data_saida   DateTime @updatedAt
+  @@map("treinos")
+}
+
+model Instrutor {
+  id_instrutor  Int     @id @default(autoincrement())
+  nome          String  @db.VarChar(30)
+  email         String  @db.VarChar(40)
+  senha         String  @db.VarChar(255)
+  telefone      String   @db.VarChar(20)
+  especialidade String  @db.VarChar(50)
+  ativo         Boolean @default(true)
+  foto          String
+  @@map("instrutores")
+}
+
+model Plano {
+  id_plano      Int     @id @default(autoincrement())
+  nome_plano    String  @db.VarChar(30)
+  descricao     String  @db.VarChar(100)
+  duracao_meses Int     @db.SmallInt
+  valor_plano   Float
+  ativo         Boolean @default(true)
+  destaque      Boolean @default(false)
+  ia_texto      String?
+  ia_modelo     String?
+  ia_gerado_em  DateTime?
+  horarios      Horario[]
+  agendamentos  Agendamento[]
+  @@map("planos")
+}
+
+model Admin {
+  id_admin     String @id @default(uuid()) @db.Uuid
+  nome         String @db.VarChar(80)
+  email        String @unique @db.VarChar(254)
+  senha        String @db.VarChar(255)
+  ativo        Boolean @default(true)
+  respostas    Agendamento[]
+}
+
+model Horario {
+  id_horario   Int @id @default(autoincrement())
+  id_plano     Int
+  data_hora    DateTime
+  ativo        Boolean @default(true)
+  plano        Plano @relation(fields: [id_plano], references: [id_plano], onDelete: Restrict)
+  agendamentos Agendamento[]
+  @@unique([id_plano, data_hora])
+}
+
+model Agendamento {
+  id_agendamento String @id @default(uuid()) @db.Uuid
+  id_cliente     String @db.Uuid
+  id_plano       Int
+  id_horario     Int
+  id_admin       String? @db.Uuid
+  observacao_cliente String @default("") @db.VarChar(500)
+  status         StatusAgendamento @default(Pendente)
+  resposta_admin String? @db.VarChar(1000)
+  criado_em      DateTime @default(now())
+  respondido_em  DateTime?
+  plano          Plano @relation(fields: [id_plano], references: [id_plano], onDelete: Restrict)
+  horario        Horario @relation(fields: [id_horario], references: [id_horario], onDelete: Restrict)
+  admin          Admin? @relation(fields: [id_admin], references: [id_admin], onDelete: Restrict)
+  @@index([id_cliente, criado_em])
+  @@index([status])
+}
+
+enum StatusAgendamento {
+  Pendente
+  Confirmado
+  Recusado
+  Cancelado
+}
+
+model Pagamento {
+  id_pagamento     Int              @id @default(autoincrement())
+  id_estudante     Int
+  id_plano         Int
+  data_pagamento   DateTime         @default(now())
+  data_vencimento  DateTime
+  valor            Float
+  metodo           MetodoPagamento
+  status_pagamento StatusPagamento
+  @@map("pagamentos")
+}
+
+enum MetodoPagamento {
+  Dinheiro
+  Cartao
+  PIX
+}
+
+enum StatusPagamento {
+  Pendente
+  Pago
+  Atrasado
+}
