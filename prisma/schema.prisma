@@ -7,115 +7,160 @@ datasource db {
   provider = "postgresql"
 }
 
+
+model Usuario {
+  id String @id @default(uuid()) @db.Uuid
+  nome     String
+  cpf      String @unique @db.VarChar(11)
+  email    String @unique
+  telefone String
+  senhaHash String?
+  perfil PerfilUsuario
+  status StatusConta @default(AGUARDANDO_ATIVACAO)
+  emailVerificadoEm DateTime? @db.Timestamptz(3)
+  estudante Estudante?
+  motorista Motorista?
+  estudantesAnalisados  Estudante[] @relation("AnaliseEstudante")
+  motoristasCadastrados Motorista[] @relation("CadastroMotorista")
+  criadoEm     DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+}
+
 model Estudante {
-  id_estudante    Int      @id @default(autoincrement())
-  nome            String   @db.VarChar(30)
-  data_nascimento Int      @db.SmallInt
-  cpf             String   @db.VarChar(14)
-  email           String   @db.VarChar(40)
-  telefone        String   @db.VarChar(20)
-  data_cadastro   String?
-  foto            String
-  status          DateTime @default(now())
-  agendamentos     Agendamento[]
-  senha           String?  @db.VarChar(255)
-  @@map("estudantes")
+  id String @id @default(uuid()) @db.Uuid
+  usuarioId String  @unique @db.Uuid
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  instituicaoEnsinoId String            @db.Uuid
+  instituicaoEnsino   InstituicaoEnsino @relation(fields: [instituicaoEnsinoId], references: [id], onDelete: Restrict)
+  matricula         String
+  previsaoConclusao DateTime @db.Date
+  statusCadastro StatusCadastroEstudante @default(PENDENTE)
+  analisadoEm      DateTime? @db.Timestamptz(3)
+  observacaoAnalise String?
+  analisadoPorId String?  @db.Uuid
+  analisadoPor   Usuario? @relation("AnaliseEstudante", fields: [analisadoPorId], references: [id], onDelete: Restrict)
+  comprovantes ComprovanteMatricula[]
+  criadoEm     DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([instituicaoEnsinoId])
+  @@index([analisadoPorId])
+  @@index([statusCadastro])
 }
 
-model Operador {
-  id_estudante    Int      @id @default(autoincrement())
-  nome            String   @db.VarChar(30)
-  data_nascimento Int      @db.SmallInt
-  cpf             String   @db.VarChar(14)
-  email           String   @db.VarChar(40)
-  telefone        String   @db.VarChar(20)
-  data_cadastro   String?
-  status          DateTime @default(now())
-  agendamentos     Agendamento[]
-  senha           String?  @db.VarChar(255)
-  @@map("operadores")
+model Motorista {
+  id String @id @default(uuid()) @db.Uuid
+  usuarioId String  @unique @db.Uuid
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  numeroCnh    String   @unique @db.VarChar(11)
+  categoriaCnh String   @db.VarChar(2)
+  validadeCnh  DateTime @db.Date
+  cadastradoPorId String  @db.Uuid
+  cadastradoPor   Usuario @relation("CadastroMotorista", fields: [cadastradoPorId], references: [id], onDelete: Restrict)
+  escalas EscalaSemanal[]
+  criadoEm     DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([cadastradoPorId])
 }
 
-model Plano {
-  id_plano      Int     @id @default(autoincrement())
-  nome_plano    String  @db.VarChar(30)
-  descricao     String  @db.VarChar(100)
-  duracao_meses Int     @db.SmallInt
-  valor_plano   Float
-  ativo         Boolean @default(true)
-  destaque      Boolean @default(false)
-  ia_texto      String?
-  ia_modelo     String?
-  ia_gerado_em  DateTime?
-  horarios      Horario[]
-  agendamentos  Agendamento[]
-  @@map("planos")
+model InstituicaoEnsino {
+  id String @id @default(uuid()) @db.Uuid
+  nome  String
+  ativa Boolean @default(true)
+  estudantes Estudante[]
+  criadoEm     DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 }
 
-model Admin {
-  id_admin     String @id @default(uuid()) @db.Uuid
-  nome         String @db.VarChar(80)
-  email        String @unique @db.VarChar(254)
-  senha        String @db.VarChar(255)
-  ativo        Boolean @default(true)
-  respostas    Agendamento[]
+model ComprovanteMatricula {
+  id String @id @default(uuid()) @db.Uuid
+
+  estudanteId String    @db.Uuid
+  estudante   Estudante @relation(fields: [estudanteId], references: [id], onDelete: Restrict)
+  chaveArquivo String @unique
+  nomeOriginal String
+  tipoMime     String
+  tamanhoBytes Int
+  enviadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([estudanteId])
 }
 
-model Horario {
-  id_horario   Int @id @default(autoincrement())
-  id_plano     Int
-  data_hora    DateTime
-  ativo        Boolean @default(true)
-  plano        Plano @relation(fields: [id_plano], references: [id_plano], onDelete: Restrict)
-  agendamentos Agendamento[]
-  @@unique([id_plano, data_hora])
+model Veiculo {
+  id String @id @default(uuid()) @db.Uuid
+
+  identificacao String
+  placa         String      @unique @db.VarChar(7)
+  tipo          TipoVeiculo
+  capacidade    Int
+  ativo         Boolean     @default(true)
+
+  escalas EscalaSemanal[]
+
+  criadoEm     DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 }
 
-model Agendamento {
-  id_agendamento String @id @default(uuid()) @db.Uuid
-  id_cliente     String @db.Uuid
-  id_plano       Int
-  id_horario     Int
-  id_admin       String? @db.Uuid
-  observacao_cliente String @default("") @db.VarChar(500)
-  status         StatusAgendamento @default(Pendente)
-  resposta_admin String? @db.VarChar(1000)
-  criado_em      DateTime @default(now())
-  respondido_em  DateTime?
-  plano          Plano @relation(fields: [id_plano], references: [id_plano], onDelete: Restrict)
-  horario        Horario @relation(fields: [id_horario], references: [id_horario], onDelete: Restrict)
-  admin          Admin? @relation(fields: [id_admin], references: [id_admin], onDelete: Restrict)
-  @@index([id_cliente, criado_em])
-  @@index([status])
+model EscalaSemanal {
+  id String @id @default(uuid()) @db.Uuid
+
+  diaSemana DiaSemana
+  turno     Turno
+
+  motoristaId String    @db.Uuid
+  motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
+
+  veiculoId String  @db.Uuid
+  veiculo   Veiculo @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
+
+  criadoEm     DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+
+  // Um motorista e um veículo principais
+  // por dia da semana e turno.
+  @@unique([diaSemana, turno])
+
+  @@index([motoristaId])
+  @@index([veiculoId])
 }
 
-enum StatusAgendamento {
-  Pendente
-  Confirmado
-  Recusado
-  Cancelado
+enum PerfilUsuario {
+  ESTUDANTE
+  MOTORISTA
+  OPERADOR
 }
 
-model Pagamento {
-  id_pagamento     Int              @id @default(autoincrement())
-  id_estudante     Int
-  id_plano         Int
-  data_pagamento   DateTime         @default(now())
-  data_vencimento  DateTime
-  valor            Float
-  metodo           MetodoPagamento
-  status_pagamento StatusPagamento
-  @@map("pagamentos")
+enum StatusConta {
+  AGUARDANDO_ATIVACAO
+  ATIVA
+  BLOQUEADA
+  INATIVA
 }
 
-enum MetodoPagamento {
-  Dinheiro
-  Cartao
-  PIX
+enum StatusCadastroEstudante {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  SUSPENSO
 }
 
-enum StatusPagamento {
-  Pendente
-  Pago
-  Atrasado
+enum TipoVeiculo {
+  ONIBUS
+  VAN
+}
+
+enum Turno {
+  MANHA
+  TARDE
+  NOITE
+}
+
+enum DiaSemana {
+  SEGUNDA
+  TERCA
+  QUARTA
+  QUINTA
+  SEXTA
+  SABADO
+  DOMINGO
 }
