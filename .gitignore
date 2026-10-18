@@ -4,3 +4,5 @@ generated/
 .env.*
 !.env.example
 dist/
+
+Analise-shcema.md
