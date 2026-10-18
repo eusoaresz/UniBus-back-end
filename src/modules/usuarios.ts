@@ -5,8 +5,8 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { randomInt } from "crypto";
 import { prisma } from "../../lib/prisma";
-import { transporter } from "../../lib/mailer";
-import { verificarToken } from "../middlewares/auth";
+import { mailFrom, transporter } from "../../lib/mailer";
+import { verificarToken } from "./middlewares/auth";
 
 dotenv.config();
 
@@ -172,7 +172,7 @@ router.post("/recuperar-senha", async (req, res) => {
     });
 
     await transporter.sendMail({
-      from: process.env.SMTP_USER,
+      from: mailFrom,
       to: email,
       subject: "Código de Recuperação de Senha",
       text: `Seu código de recuperação é: ${codigo}. Ele expira em 15 minutos.`,
