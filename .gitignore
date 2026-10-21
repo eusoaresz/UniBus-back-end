@@ -4,3 +4,6 @@ generated/
 .env.*
 !.env.example
 dist/
+
+coverage/
+*.log
