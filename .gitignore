@@ -5,4 +5,5 @@ generated/
 !.env.example
 dist/
 
-Analise-shcema.md
+coverage/
+*.log

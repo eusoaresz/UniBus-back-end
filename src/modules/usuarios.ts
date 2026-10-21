@@ -6,18 +6,19 @@ import dotenv from "dotenv";
 import { randomInt } from "crypto";
 import { prisma } from "../../lib/prisma";
 import { mailFrom, transporter } from "../../lib/mailer";
-import { verificarToken } from "./middlewares/auth";
+import { verificarToken, exigirOperador, type ReqUsuario } from "./middlewares/auth";
 
 dotenv.config();
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET;
+const jwtSecret = process.env.JWT_SECRET;
 const SALT_ROUNDS = 10;
 const RECUPERACAO_EXPIRA_EM_MS = 15 * 60 * 1000;
 
-if (!JWT_SECRET) {
+if (!jwtSecret) {
   throw new Error("A variável de ambiente JWT_SECRET não foi definida.");
 }
+const JWT_SECRET: string = jwtSecret;
 
 const senhaForteSchema = z
   .string()
@@ -55,7 +56,7 @@ function gerarCodigoRecuperacao(): string {
   return randomInt(100000, 1000000).toString();
 }
 
-router.post("/", async (req, res) => {
+router.post("/", verificarToken, exigirOperador, async (req: ReqUsuario, res) => {
   const validacao = usuarioSchema.safeParse(req.body);
   if (!validacao.success) {
     return res.status(400).json({ erro: validacao.error.flatten().fieldErrors });
@@ -76,7 +77,7 @@ router.post("/", async (req, res) => {
 
     const senhaHash = await bcrypt.hash(senha, SALT_ROUNDS);
     const novoUsuario = await prisma.usuario.create({
-      data: { nome, cpf, email, telefone, senhaHash, perfil },
+      data: { nome, cpf, email, telefone, senhaHash, perfil, cadastradoPorId: req.usuarioId },
       select: { id: true, nome: true, cpf: true, email: true, telefone: true, perfil: true, status: true },
     });
 
@@ -87,7 +88,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/", verificarToken, async (_req, res) => {
+router.get("/", verificarToken, exigirOperador, async (_req, res) => {
   try {
     const usuarios = await prisma.usuario.findMany({
       select: {
@@ -127,7 +128,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ erro: "Email ou senha inválidos" });
     }
 
-    if (usuario.status === "BLOQUEADA" || usuario.status === "INATIVA") {
+    if (usuario.status !== "ATIVA") {
       return res.status(403).json({ erro: "Conta sem permissão para acesso" });
     }
 
