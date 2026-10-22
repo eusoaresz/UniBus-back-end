@@ -18,7 +18,8 @@ export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     adapter,
-    log: process.env.NODE_ENV === "development" ? ["query", "warn", "error"] : ["warn", "error"],
+    // Logs de consultas/erros podem carregar documentos e parâmetros pessoais.
+    log: [],
   });
 
 if (process.env.NODE_ENV !== "production") {
