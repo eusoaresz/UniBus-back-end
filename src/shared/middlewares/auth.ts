@@ -1,13 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
-import "dotenv/config";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../../lib/prisma";
-
-const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret) {
-  throw new Error("A variável de ambiente JWT_SECRET não foi definida.");
-}
-const JWT_SECRET: string = jwtSecret;
+import { JWT_SECRET } from "../../modules/auth/auth.config";
 
 export interface ReqUsuario extends Request {
   usuarioId?: string;
@@ -50,7 +44,7 @@ export async function verificarToken(req: ReqUsuario, res: Response, next: NextF
     req.usuarioEmail = usuario.email;
     req.usuarioPerfil = usuario.perfil;
   } catch (error) {
-    console.error("Erro ao verificar acesso:", error);
+    console.error("Erro ao verificar acesso");
     return res.status(500).json({ erro: "Não foi possível verificar o acesso" });
   }
   return next();

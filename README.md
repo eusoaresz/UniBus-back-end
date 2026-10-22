@@ -17,7 +17,11 @@ Requisitos: Node.js 24, npm, PostgreSQL e uma conta de sandbox SMTP no Mailtrap.
 
 O e-mail utiliza `sandbox.smtp.mailtrap.io:2525`: as mensagens são capturadas no Mailtrap, sem entrega real aos usuários.
 
-## Rotas disponíveis
+## Módulo reorganizado
+
+Consulte [o contrato e os testes de usuários](docs/usuarios.md) e [as requisições manuais](docs/usuarios.http). As rotas canônicas são `/api/v1/usuarios` e `/api/v1/auth`; os caminhos antigos continuam temporariamente disponíveis. A listagem agora retorna `{ dados, meta }`; CPF não é retornado pela API. JWT_SECRET deve ter pelo menos 32 bytes.
+
+## Rotas anteriores (aliases temporários)
 
 | Método | Rota | Acesso |
 |---|---|---|
@@ -31,7 +35,7 @@ Nas rotas protegidas, envie `Authorization: Bearer <token>`. O cadastro recebe `
 
 O login recebe `email` e `senha`; a solicitação de recuperação recebe `email`; a redefinição recebe `email`, `codigo` de seis dígitos e `novaSenha`.
 
-**Limitação atual:** novas contas ficam aguardando ativação. O fluxo de ativação e a criação segura do primeiro operador ainda não estão implementados. Um banco vazio não permite iniciar os cadastros pela API. Não existe usuário ou senha padrão; não abra o cadastro administrativo para contornar essa pendência.
+**Limitação atual:** novas contas ficam aguardando ativação. Um operador pode alterar o status de outra conta em `PATCH /api/v1/usuarios/:id/status`; isso não verifica e-mail nem aprova matrícula. A criação segura do primeiro operador ainda exige provisionamento administrativo. Um banco vazio não permite iniciar os cadastros pela API. Não existe usuário ou senha padrão; não abra o cadastro administrativo para contornar essa pendência.
 
 ## Verificação
 
