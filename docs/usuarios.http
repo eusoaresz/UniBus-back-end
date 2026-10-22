@@ -1,0 +1,69 @@
+# Dados fictícios. Não versione tokens ou credenciais reais.
+@base = http://localhost:3000/api/v1
+@token = SUBSTITUA_LOCALMENTE
+@usuarioId = SUBSTITUA_PELO_ID_CRIADO
+
+### Login com operador de desenvolvimento previamente provisionado
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "operador@example.com", "senha": "SUBSTITUA_LOCALMENTE" }
+
+### Cadastro pelo operador
+POST {{base}}/usuarios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "Estudante de Teste",
+  "cpf": "52998224725",
+  "email": "estudante@example.com",
+  "telefone": "53991234567",
+  "senha": "ExemploTeste123!",
+  "perfil": "ESTUDANTE"
+}
+
+### Lista sem documentos e contatos
+GET {{base}}/usuarios?pagina=1&limite=20&perfil=ESTUDANTE
+Authorization: Bearer {{token}}
+
+### Perfil próprio
+GET {{base}}/usuarios/me
+Authorization: Bearer {{token}}
+
+### Editar perfil próprio
+PATCH {{base}}/usuarios/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "nome": "Nome Atualizado", "telefone": "53991234567" }
+
+### Consulta individual pelo operador
+GET {{base}}/usuarios/{{usuarioId}}
+Authorization: Bearer {{token}}
+
+### Ativação administrativa (não aprova matrícula)
+PATCH {{base}}/usuarios/{{usuarioId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "ATIVA" }
+
+### Desativação lógica
+PATCH {{base}}/usuarios/{{usuarioId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "INATIVA" }
+
+### Recuperação: confira o Mailtrap
+POST {{base}}/auth/recuperar-senha
+Content-Type: application/json
+
+{ "email": "estudante@example.com" }
+
+### Substitua o código pelo recebido
+POST {{base}}/auth/redefinir-senha
+Content-Type: application/json
+
+{ "email": "estudante@example.com", "codigo": "000000", "novaSenha": "NovaSenhaTeste123!" }
