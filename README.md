@@ -2,7 +2,7 @@
 
 API em desenvolvimento para gestão de transporte de estudantes, construída com Node.js, TypeScript, Express, PostgreSQL e Prisma.
 
-O módulo de usuários implementa cadastro por operador, listagem restrita, login e recuperação de senha. Os demais domínios existem no schema, mas suas APIs ainda não foram implementadas. Consulte [a arquitetura e as pendências](docs/arquitetura.md).
+O módulo de usuários implementa cadastro por operador, listagem restrita, login e recuperação de senha. O módulo de viagens implementa criação, consulta e edição de rascunhos por operador. Consulte [o contrato de viagens e a preparação da migração](docs/viagens.md) e [a arquitetura e as pendências](docs/arquitetura.md).
 
 ## Executar localmente
 
@@ -12,7 +12,7 @@ Requisitos: Node.js 24, npm, PostgreSQL e uma conta de sandbox SMTP no Mailtrap.
 2. Copie `.env.example` para `.env` e preencha os valores locais. Não versione esse arquivo.
 3. Gere um segredo JWT aleatório, por exemplo com `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
 4. Execute `npm run prisma:generate` e `npm run prisma:validate`.
-5. Aponte `DATABASE_URL` para um banco de desenvolvimento e execute `npm run prisma:migrate` para aplicar as migrações.
+5. Aponte `DATABASE_URL` para um banco de desenvolvimento. Antes de executar `npm run prisma:migrate`, revise a preparação de dados em [viagens](docs/viagens.md), principalmente se houver viagens existentes. Coordene migrações em banco compartilhado.
 6. Inicie com `npm run dev`. A porta padrão é 3000.
 
 O e-mail utiliza `sandbox.smtp.mailtrap.io:2525`: as mensagens são capturadas no Mailtrap, sem entrega real aos usuários.
@@ -39,7 +39,7 @@ O login recebe `email` e `senha`; a solicitação de recuperação recebe `email
 
 ## Verificação
 
-- `npm test`: regressões de autenticação/autorização com banco simulado.
+- `npm test`: regressões de autenticação/autorização e viagens com persistência simulada, além de migração SQL em PostgreSQL em memória.
 - `npm run typecheck`: verificação de tipos após gerar o Prisma Client.
 - `npm run prisma:validate`: validação do schema.
 - `npm audit`: relatório atual de dependências.

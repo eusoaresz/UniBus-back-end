@@ -74,19 +74,20 @@ enum StatusTrecho {
   CANCELADO
 }
 
-enum TipoAtendimento {
-  PRINCIPAL
-  RESERVA
+enum AlocacaoVeiculo {
+  VEICULO
+  EXTRA
 }
 
-enum StatusAtendimento {
-  CONFIRMADO
-  EM_ANDAMENTO
-  CONCLUIDO
-  CANCELADO
+enum OrigemConfirmacao {
+  ESTUDANTE
+  AUTOMATICA
+  OPERADOR
 }
 
 enum StatusParticipacao {
+  EM_ESPERA
+  EXPIRADA
   CONFIRMADA
   CANCELADA
 }
@@ -116,6 +117,7 @@ enum StatusRecarga {
 
 enum TipoMovimentacao {
   RECARGA
+  COBRANCA_CONFIRMACAO
   COBRANCA_EMBARQUE
   ESTORNO
 }
@@ -146,6 +148,8 @@ enum StatusEntrega {
 }
 
 enum AcaoParticipacao {
+  ENTRADA_FILA
+  EXPIRACAO
   CONFIRMACAO
   CANCELAMENTO
   ALTERACAO_PONTOS
@@ -192,9 +196,13 @@ model Usuario {
 
   trechosCancelados TrechoViagem[] @relation("CancelamentoTrecho")
 
-  alteracoesAtendimento AlteracaoAtendimento[]
+  alteracoesTrecho AlteracaoTrecho[]
 
-  reservasSolicitadas SolicitacaoReserva[]
+  reservasAtendidas SolicitacaoReserva[] @relation("AtendimentoReserva")
+
+  confirmacoesOperadas ParticipacaoTrecho[] @relation("ConfirmacaoOperador")
+
+  reservasSolicitadas SolicitacaoReserva[] @relation("SolicitacaoReserva")
 
   alteracoesParticipacao AlteracaoParticipacao[]
 
@@ -281,7 +289,9 @@ model Motorista {
 
   escalas EscalaSemanal[]
 
-  atendimentos AtendimentoTrecho[]
+  trechos TrechoViagem[] @relation("MotoristaTrecho")
+
+  trechosExtras TrechoViagem[] @relation("MotoristaExtraTrecho")
 
   embarques Embarque[]
 
@@ -414,7 +424,9 @@ model Veiculo {
 
   escalas EscalaSemanal[]
 
-  atendimentos AtendimentoTrecho[]
+  trechos TrechoViagem[] @relation("VeiculoTrecho")
+
+  trechosExtras TrechoViagem[] @relation("VeiculoExtraTrecho")
 
   embarques Embarque[]
 }
@@ -434,7 +446,6 @@ model EscalaSemanal {
   antecedenciaCancelamentoIdaMin   Int?
   antecedenciaConfirmacaoVoltaMin  Int?
   antecedenciaCancelamentoVoltaMin Int?
-  percentualVagasLivresReserva     Int       @default(10)
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -459,13 +470,12 @@ model EscalaSemanal {
 model Viagem {
   id String @id @default(uuid()) @db.Uuid
 
-  data                   DateTime     @db.Date
-  turno                  Turno
-  nomeRota               String
-  status                 StatusViagem @default(RASCUNHO)
-  chegadaPedroPrevistaEm DateTime?    @db.Timestamptz(3)
-  canceladaEm            DateTime?    @db.Timestamptz(3)
-  motivoCancelamento     String?
+  data               DateTime     @db.Date
+  turno              Turno
+  nomeRota           String
+  status             StatusViagem @default(RASCUNHO)
+  canceladaEm        DateTime?    @db.Timestamptz(3)
+  motivoCancelamento String?
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -494,17 +504,29 @@ model Viagem {
 model TrechoViagem {
   id String @id @default(uuid()) @db.Uuid
 
-  sentido                      SentidoTrecho
-  status                       StatusTrecho  @default(RASCUNHO)
-  saidaPrevistaEm              DateTime?     @db.Timestamptz(3)
-  limiteConfirmacaoEm          DateTime?     @db.Timestamptz(3)
-  limiteCancelamentoEm         DateTime?     @db.Timestamptz(3)
-  iniciadoEm                   DateTime?     @db.Timestamptz(3)
-  concluidoEm                  DateTime?     @db.Timestamptz(3)
-  tarifaCentavos               Int           @default(200)
-  percentualVagasLivresReserva Int           @default(10)
-  canceladoEm                  DateTime?     @db.Timestamptz(3)
-  motivoCancelamento           String?
+  sentido              SentidoTrecho
+  status               StatusTrecho  @default(RASCUNHO)
+  saidaPrevistaEm      DateTime      @db.Timestamptz(3)
+  limiteConfirmacaoEm  DateTime      @db.Timestamptz(3)
+  limiteCancelamentoEm DateTime      @db.Timestamptz(3)
+  iniciadoEm           DateTime?     @db.Timestamptz(3)
+  concluidoEm          DateTime?     @db.Timestamptz(3)
+  tarifa               Decimal       @default(2.00) @db.Decimal(10, 2)
+  chegadaPrevistaEm    DateTime      @db.Timestamptz(3)
+  capacidade           Int?
+  capacidadeExtra      Int?
+  inscricoesSuspensas  Boolean       @default(false)
+
+  motoristaId        String?    @db.Uuid
+  motorista          Motorista? @relation("MotoristaTrecho", fields: [motoristaId], references: [id], onDelete: Restrict)
+  motoristaExtraId   String?    @db.Uuid
+  motoristaExtra     Motorista? @relation("MotoristaExtraTrecho", fields: [motoristaExtraId], references: [id], onDelete: Restrict)
+  veiculoId          String?    @db.Uuid
+  veiculo            Veiculo?   @relation("VeiculoTrecho", fields: [veiculoId], references: [id], onDelete: Restrict)
+  veiculoExtraId     String?    @db.Uuid
+  veiculoExtra       Veiculo?   @relation("VeiculoExtraTrecho", fields: [veiculoExtraId], references: [id], onDelete: Restrict)
+  canceladoEm        DateTime?  @db.Timestamptz(3)
+  motivoCancelamento String?
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -517,13 +539,19 @@ model TrechoViagem {
 
   paradas ParadaTrecho[]
 
-  atendimentos AtendimentoTrecho[]
+  alteracoes AlteracaoTrecho[]
+
+  indisponibilidades IndisponibilidadeMotorista[]
 
   solicitacoesReserva SolicitacaoReserva[]
 
   participacoes ParticipacaoTrecho[]
 
   @@unique([viagemId, sentido])
+  @@index([motoristaId])
+  @@index([motoristaExtraId])
+  @@index([veiculoId])
+  @@index([veiculoExtraId])
   @@index([status, saidaPrevistaEm])
   @@index([viagemId])
   @@index([canceladoPorId])
@@ -557,44 +585,7 @@ model ParadaTrecho {
   @@index([pontoParadaId])
 }
 
-model AtendimentoTrecho {
-  id String @id @default(uuid()) @db.Uuid
-
-  tipo       TipoAtendimento
-  status     StatusAtendimento @default(CONFIRMADO)
-  prioridade Int
-  capacidade Int
-
-  criadoEm     DateTime @default(now()) @db.Timestamptz(3)
-  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
-
-  trechoId String       @db.Uuid
-  trecho   TrechoViagem @relation(fields: [trechoId], references: [id], onDelete: Restrict)
-
-  veiculoId String  @db.Uuid
-  veiculo   Veiculo @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
-
-  motoristaId String    @db.Uuid
-  motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
-
-  solicitacaoReservaId String?             @unique @db.Uuid
-  solicitacaoReserva   SolicitacaoReserva? @relation(fields: [solicitacaoReservaId], references: [id], onDelete: Restrict)
-
-  alteracoes AlteracaoAtendimento[]
-
-  participacoes ParticipacaoTrecho[]
-
-  embarques Embarque[]
-
-  indisponibilidades IndisponibilidadeMotorista[]
-
-  @@unique([trechoId, prioridade])
-  @@index([trechoId])
-  @@index([veiculoId])
-  @@index([motoristaId])
-}
-
-model AlteracaoAtendimento {
+model AlteracaoTrecho {
   id String @id @default(uuid()) @db.Uuid
 
   motivo          String
@@ -604,13 +595,14 @@ model AlteracaoAtendimento {
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 
-  atendimentoId String            @db.Uuid
-  atendimento   AtendimentoTrecho @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  trechoId String           @db.Uuid
+  trecho   TrechoViagem     @relation(fields: [trechoId], references: [id], onDelete: Restrict)
+  alocacao AlocacaoVeiculo?
 
-  realizadaPorId String  @db.Uuid
-  realizadaPor   Usuario @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  realizadaPorId String?  @db.Uuid
+  realizadaPor   Usuario? @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
 
-  @@index([atendimentoId])
+  @@index([trechoId])
   @@index([realizadaPorId])
 }
 
@@ -623,14 +615,17 @@ model SolicitacaoReserva {
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 
-  atendimento AtendimentoTrecho?
+  atendidaEm    DateTime? @db.Timestamptz(3)
+  atendidaPorId String?   @db.Uuid
+  atendidaPor   Usuario?  @relation("AtendimentoReserva", fields: [atendidaPorId], references: [id], onDelete: Restrict)
 
   trechoId String       @db.Uuid
   trecho   TrechoViagem @relation(fields: [trechoId], references: [id], onDelete: Restrict)
 
   solicitadaPorId String  @db.Uuid
-  solicitadaPor   Usuario @relation(fields: [solicitadaPorId], references: [id], onDelete: Restrict)
+  solicitadaPor   Usuario @relation("SolicitacaoReserva", fields: [solicitadaPorId], references: [id], onDelete: Restrict)
 
+  @@index([atendidaPorId])
   @@index([trechoId])
   @@index([solicitadaPorId])
 }
@@ -638,8 +633,8 @@ model SolicitacaoReserva {
 model ParticipacaoTrecho {
   id String @id @default(uuid()) @db.Uuid
 
-  status       StatusParticipacao @default(CONFIRMADA)
-  confirmadaEm DateTime           @default(now()) @db.Timestamptz(3)
+  status       StatusParticipacao @default(EM_ESPERA)
+  confirmadaEm DateTime?          @db.Timestamptz(3)
   canceladaEm  DateTime?          @db.Timestamptz(3)
   ordemFila    BigInt             @unique @default(autoincrement())
 
@@ -658,8 +653,14 @@ model ParticipacaoTrecho {
   destinoId String       @db.Uuid
   destino   ParadaTrecho @relation("DestinoParticipacao", fields: [destinoId], references: [id], onDelete: Restrict)
 
-  atendimentoId String?            @db.Uuid
-  atendimento   AtendimentoTrecho? @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  alocacao          AlocacaoVeiculo?
+  origemConfirmacao OrigemConfirmacao?
+  confirmadaPorId   String?                @db.Uuid
+  confirmadaPor     Usuario?               @relation("ConfirmacaoOperador", fields: [confirmadaPorId], references: [id], onDelete: Restrict)
+  motivoExcecao     String?
+  limiteEstornoEm   DateTime?              @db.Timestamptz(3)
+  cicloConfirmacao  Int                    @default(0)
+  movimentacoes     MovimentacaoCarteira[]
 
   alteracoes AlteracaoParticipacao[]
 
@@ -671,7 +672,7 @@ model ParticipacaoTrecho {
   @@index([estudanteId])
   @@index([origemId])
   @@index([destinoId])
-  @@index([atendimentoId])
+  @@index([confirmadaPorId])
 }
 
 model AlteracaoParticipacao {
@@ -713,9 +714,6 @@ model Embarque {
   participacaoId String             @db.Uuid
   participacao   ParticipacaoTrecho @relation(fields: [participacaoId], references: [id], onDelete: Restrict)
 
-  atendimentoId String            @db.Uuid
-  atendimento   AtendimentoTrecho @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
-
   registradoPorId String  @db.Uuid
   registradoPor   Usuario @relation("RegistroEmbarque", fields: [registradoPorId], references: [id], onDelete: Restrict)
 
@@ -731,7 +729,6 @@ model Embarque {
   cobranca MovimentacaoCarteira?
 
   @@index([participacaoId])
-  @@index([atendimentoId])
   @@index([registradoPorId])
   @@index([estornadoPorId])
   @@index([motoristaId])
@@ -741,9 +738,9 @@ model Embarque {
 model Carteira {
   id String @id @default(uuid()) @db.Uuid
 
-  saldoCentavos         Int @default(0)
-  limiteCreditoCentavos Int @default(2000)
-  versao                Int @default(0)
+  saldo         Decimal @default(0.00) @db.Decimal(10, 2)
+  limiteCredito Decimal @default(20.00) @db.Decimal(10, 2)
+  versao        Int     @default(0)
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -759,7 +756,7 @@ model Carteira {
 model Recarga {
   id String @id @default(uuid()) @db.Uuid
 
-  valorCentavos          Int
+  valor                  Decimal        @db.Decimal(10, 2)
   formaPagamento         FormaPagamento
   status                 StatusRecarga  @default(PENDENTE)
   analisadaEm            DateTime?      @db.Timestamptz(3)
@@ -787,13 +784,17 @@ model MovimentacaoCarteira {
   id String @id @default(uuid()) @db.Uuid
 
   tipo              TipoMovimentacao
-  valorCentavos     Int
-  saldoAposCentavos Int
+  valor             Decimal          @db.Decimal(10, 2)
+  saldoApos         Decimal          @db.Decimal(10, 2)
   chaveIdempotencia String           @unique
   motivo            String?
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+
+  participacaoId   String?             @db.Uuid
+  participacao     ParticipacaoTrecho? @relation(fields: [participacaoId], references: [id], onDelete: Restrict)
+  cicloConfirmacao Int?
 
   carteiraId String   @db.Uuid
   carteira   Carteira @relation(fields: [carteiraId], references: [id], onDelete: Restrict)
@@ -812,6 +813,7 @@ model MovimentacaoCarteira {
   realizadaPorId String  @db.Uuid
   realizadaPor   Usuario @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
 
+  @@unique([participacaoId, cicloConfirmacao, tipo])
   @@index([carteiraId, criadoEm])
   @@index([carteiraId])
   @@index([realizadaPorId])
@@ -828,8 +830,9 @@ model IndisponibilidadeMotorista {
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 
-  atendimentoId String            @db.Uuid
-  atendimento   AtendimentoTrecho @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  trechoId String           @db.Uuid
+  trecho   TrechoViagem     @relation(fields: [trechoId], references: [id], onDelete: Restrict)
+  alocacao AlocacaoVeiculo?
 
   motoristaId String    @db.Uuid
   motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
@@ -838,7 +841,7 @@ model IndisponibilidadeMotorista {
   resolvidaPor   Usuario? @relation(fields: [resolvidaPorId], references: [id], onDelete: Restrict)
 
   @@index([status])
-  @@index([atendimentoId])
+  @@index([trechoId])
   @@index([motoristaId])
   @@index([resolvidaPorId])
 }
