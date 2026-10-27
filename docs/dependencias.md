@@ -16,6 +16,8 @@ As versões utilizadas são definidas em `package.json` e fixadas em `package-lo
 
 Ferramentas de desenvolvimento: `prisma` (CLI e migrações), `typescript` (tipagem), `tsx` (execução de TypeScript) e pacotes `@types/*` (declarações de tipos).
 
+`@electric-sql/pglite` é dependência explícita de desenvolvimento para testar migrações em PostgreSQL isolado em memória. Não substitui o driver PostgreSQL da aplicação nem acessa o banco compartilhado.
+
 O comando `start` também usa `tsx`, portanto a instalação atual exige dependências de desenvolvimento no ambiente de execução. Uma estratégia de compilação e implantação de produção ainda precisa ser definida.
 
 Execute `npm audit` para consultar vulnerabilidades atuais e avalie cada atualização com testes. Um resultado antigo de auditoria não descreve necessariamente o estado da instalação atual.

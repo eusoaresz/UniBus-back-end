@@ -1,6 +1,7 @@
 import express from "express";
 import usuariosRouter from "./modules/usuarios/usuarios.routes";
 import authRouter from "./modules/auth/auth.routes";
+import viagensRouter from "./modules/viagens/viagens.routes";
 import { errorHandler } from "./shared/errors/error-handler";
 
 const app = express();
@@ -14,6 +15,7 @@ app.use((_req, res, next) => {
 app.use(express.json({ limit: "32kb" }));
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/usuarios", usuariosRouter);
+app.use("/api/v1/viagens", viagensRouter);
 // Compatibilidade temporária para os clientes existentes.
 app.use("/usuarios", authRouter, usuariosRouter);
 app.use((_req, res) => { res.status(404).json({ erro: "Rota não encontrada" }); });
