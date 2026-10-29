@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { Prisma } from "../../../generated/prisma";
 import { prisma } from "../../../lib/prisma";
 import { HttpError } from "../../shared/errors/http-error";
 import { avisoSelect } from "./avisos.dto";
@@ -10,6 +11,21 @@ import {
 } from "./avisos.schemas";
 
 type FiltrosAvisos = z.infer<typeof listarAvisosSchema>;
+
+function visibilidade(perfil: string): Prisma.AvisoWhereInput {
+  const agora = new Date();
+  // Falha fechada para perfis desconhecidos, sem cast de entrada para enum.
+  const publico = perfil === "ESTUDANTE" || perfil === "MOTORISTA" || perfil === "OPERADOR" ? perfil : undefined;
+  if (!publico) throw new HttpError(403, "Perfil sem permissão para acesso");
+  return {
+    ativo: true,
+    publicadoEm: { lte: agora },
+    AND: [
+      { OR: [{ expiraEm: null }, { expiraEm: { gt: agora } }] },
+      { OR: [{ publicoPerfil: publico }, { publicoPerfil: null }] },
+    ],
+  };
+}
 
 export function criarAviso(dados: z.infer<typeof criarAvisoSchema>, operadorId: string) {
   return prisma.aviso.create({
@@ -23,26 +39,25 @@ export function criarAviso(dados: z.infer<typeof criarAvisoSchema>, operadorId: 
 }
 
 export async function listarAvisos(
-  { pagina, limite, categoria, importante }: FiltrosAvisos,
-  perfil?: string,
+  filtros: FiltrosAvisos,
+  perfil: string,
 ) {
-  const agora = new Date();
+  return listar(filtros, visibilidade(perfil));
+}
+
+export function listarGestao(filtros: FiltrosAvisos) {
+  return listar(filtros, {});
+}
+
+async function listar(
+  { pagina, limite, categoria, importante }: FiltrosAvisos,
+  visibilidade: Prisma.AvisoWhereInput,
+) {
   const registros = await prisma.aviso.findMany({
     where: {
-      ativo: true,
+      ...visibilidade,
       categoria,
       importante,
-      AND: [
-        { OR: [{ expiraEm: null }, { expiraEm: { gte: agora } }] },
-        ...(perfil
-          ? [{
-              OR: [
-                { publicoPerfil: perfil as "ESTUDANTE" | "MOTORISTA" | "OPERADOR" },
-                { publicoPerfil: null },
-              ],
-            }]
-          : []),
-      ],
     },
     skip: (pagina - 1) * limite,
     take: limite + 1,
@@ -56,14 +71,20 @@ export async function listarAvisos(
   };
 }
 
-export async function consultarAviso(id: string) {
+export async function consultarAviso(id: string, perfil: string) {
+  const aviso = await prisma.aviso.findFirst({ where: { id, ...visibilidade(perfil) }, select: avisoSelect });
+  if (!aviso) throw new HttpError(404, "Aviso não encontrado");
+  return aviso;
+}
+
+export async function consultarGestao(id: string) {
   const aviso = await prisma.aviso.findUnique({ where: { id }, select: avisoSelect });
   if (!aviso) throw new HttpError(404, "Aviso não encontrado");
   return aviso;
 }
 
 export async function editarAviso(id: string, dados: z.infer<typeof editarAvisoSchema>) {
-  await consultarAviso(id);
+  await consultarGestao(id);
   return prisma.aviso.update({
     where: { id },
     data: {
@@ -82,6 +103,6 @@ export async function alterarStatus(
   id: string,
   dados: z.infer<typeof alterarStatusAvisoSchema>,
 ) {
-  await consultarAviso(id);
+  await consultarGestao(id);
   return prisma.aviso.update({ where: { id }, data: dados, select: avisoSelect });
 }

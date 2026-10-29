@@ -10,12 +10,19 @@ export async function criar(req: ReqUsuario, res: Response) {
 
 export async function listar(req: ReqUsuario, res: Response) {
   const filtros = schemas.listarAvisosSchema.parse(req.query);
-  const perfil = req.usuarioPerfil === "OPERADOR" ? undefined : req.usuarioPerfil;
-  res.json(await service.listarAvisos(filtros, perfil));
+  res.json(await service.listarAvisos(filtros, req.usuarioPerfil!));
+}
+
+export async function gestao(req: ReqUsuario, res: Response) {
+  res.json(await service.listarGestao(schemas.listarAvisosSchema.parse(req.query)));
+}
+
+export async function consultarGestao(req: ReqUsuario, res: Response) {
+  res.json(await service.consultarGestao(schemas.avisoIdSchema.parse(req.params.id)));
 }
 
 export async function consultar(req: ReqUsuario, res: Response) {
-  res.json(await service.consultarAviso(schemas.avisoIdSchema.parse(req.params.id)));
+  res.json(await service.consultarAviso(schemas.avisoIdSchema.parse(req.params.id), req.usuarioPerfil!));
 }
 
 export async function editar(req: ReqUsuario, res: Response) {
