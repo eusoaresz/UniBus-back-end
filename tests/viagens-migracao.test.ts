@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { PGlite } from "@electric-sql/pglite";
@@ -51,6 +51,11 @@ test("migração em banco vazio corresponde às colunas, relações e índices d
   try {
     await db.exec(inicial);
     await db.exec(migracao);
+    for (const pasta of readdirSync("prisma/migrations").sort()) {
+      if (pasta > "20261027000100_viagens_rascunhos" && pasta !== "migration_lock.toml") {
+        await db.exec(readFileSync(`prisma/migrations/${pasta}/migration.sql`, "utf8"));
+      }
+    }
     const sql = spawnSync(process.execPath, ["node_modules/prisma/build/index.js", "migrate", "diff", "--from-empty", "--to-schema", "prisma/schema.prisma", "--script"], {
       encoding: "utf8", env: { ...process.env, DATABASE_URL: "postgresql://test:test@localhost:5432/test" }, timeout: 60000,
     });

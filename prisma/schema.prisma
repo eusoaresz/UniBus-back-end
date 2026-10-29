@@ -122,6 +122,11 @@ enum TipoMovimentacao {
   ESTORNO
 }
 
+enum CategoriaAviso {
+  GERAL
+  VIAGENS
+}
+
 enum StatusIndisponibilidade {
   PENDENTE
   RESOLVIDA
@@ -851,9 +856,12 @@ model Aviso {
 
   titulo        String
   mensagem      String
+  categoria     CategoriaAviso @default(GERAL)
+  importante    Boolean        @default(false)
+  ativo         Boolean        @default(true)
   publicoPerfil PerfilUsuario?
   publicadoEm   DateTime       @default(now()) @db.Timestamptz(3)
-  expiraEm      DateTime?      @db.Timestamptz(3)
+  expiraEm       DateTime?       @db.Timestamptz(3)
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -864,6 +872,7 @@ model Aviso {
   notificacoes Notificacao[]
 
   @@index([publicadoPorId])
+  @@index([ativo, publicadoEm])
 }
 
 model DispositivoUsuario {
