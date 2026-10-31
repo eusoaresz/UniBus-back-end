@@ -27,7 +27,7 @@ Os caminhos antigos `/usuarios` e `/usuarios/login`, `/usuarios/recuperar-senha`
 
 Filtros: `?pagina=1&limite=20&perfil=ESTUDANTE&status=ATIVA`. Limite máximo 100; filtros desconhecidos são rejeitados. `meta` contém `pagina`, `limite` e `temProxima`.
 
-Cadastro recebe nome, cpf, email, telefone, senha e perfil. CPF aceita máscara e valida dígitos; telefone brasileiro exige DDD; e-mail é normalizado. Senha exige oito caracteres, maiúscula, minúscula, número e símbolo, com teto de 72 bytes (bcrypt). Campos extras são rejeitados. Conta criada fica AGUARDANDO_ATIVACAO.
+Cadastro recebe nome, cpf, email, telefone, senha e perfil (MOTORISTA ou OPERADOR). Estudantes usam `/api/v1/estudantes`, com dados acadêmicos, aprovação presencial e criação da carteira na mesma transação; tentar cadastrar ESTUDANTE pela rota genérica retorna 409. CPF aceita máscara e valida dígitos; telefone brasileiro exige DDD; e-mail é normalizado. Senha exige oito caracteres, maiúscula, minúscula, número e símbolo, com teto de 72 bytes (bcrypt). Campos extras são rejeitados. Conta criada fica AGUARDANDO_ATIVACAO.
 
 Status aceitos: ATIVA, BLOQUEADA e INATIVA. Ativação administrativa não significa verificação do e-mail ou aprovação da matrícula. Operador não pode alterar seu próprio status. Exclusão é lógica: não existe DELETE físico. CPF, perfil e e-mail não são editados neste módulo; precisam de fluxos específicos de correção/verificação.
 

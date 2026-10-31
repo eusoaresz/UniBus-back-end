@@ -9,8 +9,8 @@ Content-Type: application/json
 
 { "email": "operador@example.com", "senha": "SUBSTITUA_LOCALMENTE" }
 
-### Cadastro pelo operador
-POST {{base}}/usuarios
+### Cadastro unificado de estudante pelo operador
+POST {{base}}/estudantes
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -20,7 +20,9 @@ Content-Type: application/json
   "email": "estudante@example.com",
   "telefone": "53991234567",
   "senha": "ExemploTeste123!",
-  "perfil": "ESTUDANTE"
+  "unidadeEnsinoId": "10000000-0000-4000-8000-000000000005",
+  "matricula": "TESTE-001",
+  "previsaoConclusao": "2030-12-31"
 }
 
 ### Lista sem documentos e contatos

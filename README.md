@@ -4,6 +4,8 @@ API em desenvolvimento para gestão de transporte de estudantes, construída com
 
 O módulo de usuários implementa cadastro por operador, listagem restrita, login e recuperação de senha. O módulo de viagens implementa criação, consulta e edição de rascunhos por operador. Consulte [o contrato de viagens e a preparação da migração](docs/viagens.md) e [a arquitetura e as pendências](docs/arquitetura.md).
 
+A carteira manual implementa saldo, extrato, recargas Pix e dinheiro, análise pelo operador, estorno integral e serviço interno de débito. Veja [o contrato da carteira](docs/carteira.md) e [as instruções para abrir a cópia de revisão](ABRIR-PROJETO.md). A integração com confirmação de viagem ainda não está implementada.
+
 ## Executar localmente
 
 Requisitos: Node.js 24, npm, PostgreSQL e uma conta de sandbox SMTP no Mailtrap.
@@ -31,11 +33,11 @@ Consulte [o contrato e os testes de usuários](docs/usuarios.md) e [as requisiç
 | POST | `/usuarios/recuperar-senha` | Público |
 | POST | `/usuarios/redefinir-senha` | Público; exige código válido |
 
-Nas rotas protegidas, envie `Authorization: Bearer <token>`. O cadastro recebe `nome`, `cpf` (11 dígitos), `email`, `telefone`, `senha` e `perfil` (`ESTUDANTE`, `MOTORISTA` ou `OPERADOR`). A senha exige pelo menos oito caracteres, maiúscula, minúscula, número e símbolo.
+Nas rotas protegidas, envie `Authorization: Bearer <token>`. O cadastro recebe `nome`, `cpf` (11 dígitos), `email`, `telefone`, `senha` e `perfil` (`MOTORISTA` ou `OPERADOR`). A senha exige pelo menos oito caracteres, maiúscula, minúscula, número e símbolo.
 
 O login recebe `email` e `senha`; a solicitação de recuperação recebe `email`; a redefinição recebe `email`, `codigo` de seis dígitos e `novaSenha`.
 
-**Limitação atual:** novas contas ficam aguardando ativação. Um operador pode alterar o status de outra conta em `PATCH /api/v1/usuarios/:id/status`; isso não verifica e-mail nem aprova matrícula. A criação segura do primeiro operador ainda exige provisionamento administrativo. Um banco vazio não permite iniciar os cadastros pela API. Não existe usuário ou senha padrão; não abra o cadastro administrativo para contornar essa pendência.
+**Limitação atual:** novas contas ficam aguardando ativação. Um operador pode alterar o status de outra conta em `PATCH /api/v1/usuarios/:id/status`; isso não verifica e-mail nem aprova matrícula. O cadastro unificado de estudante em `/api/v1/estudantes` já cria matrícula aprovada e carteira; veja [o contrato](docs/estudantes.md). Para desenvolvimento, `npm run seed:local` prepara o primeiro operador apenas em PostgreSQL local, com credenciais fornecidas pelo desenvolvedor. Provisionamento administrativo de produção ainda precisa ser definido. Não existe senha padrão nem cadastro público de operador.
 
 ## Verificação
 

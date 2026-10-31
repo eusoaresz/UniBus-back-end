@@ -6,6 +6,7 @@ import { criarUsuarioSchema, atualizarMeSchema, listarUsuariosSchema, statusSche
 import { usuarioSelect, usuarioListaSelect } from "./usuarios.dto";
 
 export async function criarUsuario(dados: z.infer<typeof criarUsuarioSchema>, operadorId: string) {
+  if (dados.perfil === "ESTUDANTE") throw new HttpError(409, "Cadastre o estudante em /api/v1/estudantes com os dados acadêmicos para criar sua carteira");
   const { senha, ...usuario } = dados;
   return prisma.usuario.create({
     data: { ...usuario, senhaHash: await bcrypt.hash(senha, 10), cadastradoPorId: operadorId },
@@ -33,6 +34,5 @@ export function atualizarMe(id: string, dados: z.infer<typeof atualizarMeSchema>
 
 export function alterarStatus(id: string, operadorId: string, dados: z.infer<typeof statusSchema>) {
   if (id === operadorId) throw new HttpError(409, "Não é permitido alterar o próprio status nesta rota");
-  // Desativação preserva vínculos financeiros e operacionais; não há DELETE físico.
   return prisma.usuario.update({ where: { id }, data: { status: dados.status }, select: usuarioSelect });
 }

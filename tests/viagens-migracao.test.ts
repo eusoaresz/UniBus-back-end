@@ -104,6 +104,18 @@ test("migração preserva dinheiro, alocações, embarques e históricos existen
     assert.equal(snapshot.realizadaPorId, null);
     await assert.rejects(db.exec(`UPDATE "TrechoViagem" SET "chegadaPrevistaEm" = "saidaPrevistaEm"`));
     await assert.rejects(db.exec('UPDATE "TrechoViagem" SET capacidade = 0'));
+    const usuarioSemCarteira = await inserir(db, "Usuario", { nome: "Estudante legado", cpf: "11144477735", email: "legado@example.com", telefone: "53999999999", perfil: "ESTUDANTE" });
+    const unidade = (await db.query<any>('SELECT "unidadeEnsinoId" FROM "Estudante" LIMIT 1')).rows[0].unidadeEnsinoId;
+    const estudanteSemCarteira = await inserir(db, "Estudante", { usuarioId: usuarioSemCarteira, unidadeEnsinoId: unidade, matricula: "LEGADO", previsaoConclusao: "2030-12-31" });
+    await db.exec(readFileSync("prisma/migrations/20261028000100_carteira_manual/migration.sql", "utf8"));
+    assert.deepEqual((await db.query('SELECT saldo::text, "limiteCredito"::text FROM "Carteira" WHERE "estudanteId" = $1', [estudanteSemCarteira])).rows, [{ saldo: "0.00", limiteCredito: "20.00" }]);
+    const convertida = (await db.query<any>('SELECT tipo, valor::text, "participacaoId", "cicloConfirmacao", "embarqueId" FROM "MovimentacaoCarteira" WHERE "chaveIdempotencia" = \'debito\'')).rows[0];
+    assert.equal(convertida.tipo, "COBRANCA_CONFIRMACAO");
+    assert.equal(convertida.valor, "-2.50");
+    assert.equal(convertida.participacaoId, ids.participacao);
+    assert.equal(convertida.cicloConfirmacao, 1);
+    assert.ok(convertida.embarqueId);
+    assert.equal((await db.query<any>('SELECT saldo::text FROM "Carteira" WHERE id = $1', [ids.carteira])).rows[0].saldo, "-12.34");
   } finally { await db.close(); }
 });
 
