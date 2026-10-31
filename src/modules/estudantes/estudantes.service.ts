@@ -55,19 +55,26 @@ async function validarUnidade(tx: Prisma.TransactionClient, unidadeEnsinoId: str
 }
 
 export async function criarEstudante(dados: DadosCriacao, operadorId: string) {
-  const { senha, matricula, unidadeEnsinoId, previsaoConclusao, ...usuario } = dados;
+  const { senha, matricula, unidadeEnsinoId, previsaoConclusao, curso, cidadeOrigemId, dataNascimento, ...usuario } = dados;
   const senhaHash = await bcrypt.hash(senha, 10);
   return comTransacao(async (tx) => {
     await validarUnidade(tx, unidadeEnsinoId);
+    if (cidadeOrigemId) {
+      const cidade = await tx.cidade.findUnique({ where: { id: cidadeOrigemId }, select: { ativa: true } });
+      if (!cidade?.ativa) throw new HttpError(400, "Cidade de origem inexistente ou inativa");
+    }
     const estudante = await tx.estudante.create({
       data: {
         matricula,
+        curso: curso ?? null,
+        cidadeOrigem: cidadeOrigemId ? { connect: { id: cidadeOrigemId } } : undefined,
         previsaoConclusao: new Date(previsaoConclusao),
         unidadeEnsino: { connect: { id: unidadeEnsinoId } },
         statusCadastro: "APROVADO",
         analisadoEm: new Date(),
         analisadoPor: { connect: { id: operadorId } },
-        usuario: { create: { ...usuario, perfil: "ESTUDANTE", senhaHash, cadastradoPorId: operadorId } },
+        usuario: { create: { ...usuario, dataNascimento: dataNascimento ? new Date(`${dataNascimento}T00:00:00Z`) : null,
+          perfil: "ESTUDANTE", senhaHash, cadastradoPorId: operadorId } },
         carteira: { create: {} },
       },
       select: estudanteDetalheSelect,

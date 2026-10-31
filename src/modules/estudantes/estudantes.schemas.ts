@@ -9,6 +9,8 @@ export const criarEstudanteSchema = criarUsuarioSchema.omit({ perfil: true }).ex
   matricula,
   previsaoConclusao,
   unidadeEnsinoId,
+  curso: z.string().trim().min(2).max(150).nullable().optional(),
+  cidadeOrigemId: z.string().uuid().nullable().optional(),
 });
 
 export const editarEstudanteSchema = z.strictObject({
