@@ -118,7 +118,6 @@ enum StatusRecarga {
 enum TipoMovimentacao {
   RECARGA
   COBRANCA_CONFIRMACAO
-  COBRANCA_EMBARQUE
   ESTORNO
 }
 
@@ -217,6 +216,8 @@ model Usuario {
 
   recargasAnalisadas Recarga[]
 
+  recargasSolicitadas Recarga[] @relation("SolicitacaoRecarga")
+
   movimentacoesRealizadas MovimentacaoCarteira[]
 
   indisponibilidadesResolvidas IndisponibilidadeMotorista[]
@@ -274,6 +275,7 @@ model Estudante {
 
   carteira Carteira?
 
+  @@unique([unidadeEnsinoId, matricula])
   @@index([statusCadastro])
   @@index([unidadeEnsinoId])
   @@index([analisadoPorId])
@@ -780,6 +782,10 @@ model Recarga {
 
   credito MovimentacaoCarteira?
 
+  solicitadaPorId String?  @db.Uuid
+  solicitadaPor   Usuario? @relation("SolicitacaoRecarga", fields: [solicitadaPorId], references: [id], onDelete: Restrict)
+
+  @@index([solicitadaPorId])
   @@index([carteiraId, status])
   @@index([carteiraId])
   @@index([analisadaPorId])
