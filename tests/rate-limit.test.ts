@@ -3,6 +3,16 @@ import assert from "node:assert/strict";
 import type { Request, Response } from "express";
 import { limitarTentativas } from "../src/shared/middlewares/rate-limit";
 
+test("pedidos sem e-mail não compartilham limite global entre IPs", () => {
+  const limiter = limitarTentativas(1);
+  let passou = 0;
+  const res = {
+    setHeader: () => {}, status: () => res, json: () => res,
+  } as unknown as Response;
+  for (const ip of ["1", "2"]) limiter({ ip } as Request, res, () => { passou++; });
+  assert.equal(passou, 2);
+});
+
 test("limite por e-mail impede tentativas distribuídas entre IPs", () => {
   const limiter = limitarTentativas(2);
   let passou = 0;
