@@ -8,10 +8,12 @@ import {
 
 const data = new Date("2026-10-31T12:00:00Z");
 const registro = {
+  curso: null, cidadeOrigem: null,
   id: "estudante", matricula: "001", previsaoConclusao: new Date("2028-12-31T00:00:00Z"),
   statusCadastro: "PENDENTE" as const, analisadoEm: null, criadoEm: data, atualizadoEm: data,
   observacaoAnalise: "Anotação interna", analisadoPor: { id: "operador", nome: "Operador", cpf: "privado" },
   usuario: { id: "usuario", nome: "Maria", email: "teste@example.com", telefone: "53991234567",
+    dataNascimento: null, fotoChave: null,
     perfil: "ESTUDANTE" as const, status: "ATIVA" as const, cpf: "privado", senhaHash: "privado" },
   unidadeEnsino: { id: "unidade", nome: "Campus", endereco: null, ativa: true,
     instituicaoEnsino: { id: "instituicao", nome: "Universidade", tipo: "FACULDADE" as const, ativa: true } },

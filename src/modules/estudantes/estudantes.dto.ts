@@ -2,6 +2,7 @@ import type { Prisma } from "../../../generated/prisma";
 
 const usuarioResumoSelect = {
   id: true, nome: true, email: true, telefone: true, perfil: true, status: true,
+  dataNascimento: true, fotoChave: true,
 } satisfies Prisma.UsuarioSelect;
 
 const unidadeEnsinoSelect = {
@@ -15,6 +16,7 @@ export const comprovanteSelect = {
 } satisfies Prisma.ComprovanteMatriculaSelect;
 
 export const estudanteMeSelect = {
+  curso: true, cidadeOrigem: { select: { id: true, nome: true, ativa: true } },
   id: true, matricula: true, previsaoConclusao: true, statusCadastro: true,
   analisadoEm: true, criadoEm: true, atualizadoEm: true,
   usuario: { select: usuarioResumoSelect },
@@ -47,6 +49,8 @@ export function estudanteMeDto(estudante: EstudanteMe) {
   const instituicao = unidadeEnsino.instituicaoEnsino;
   return {
     id: estudante.id,
+    curso: estudante.curso ?? null,
+    cidadeOrigem: estudante.cidadeOrigem ? { id: estudante.cidadeOrigem.id, nome: estudante.cidadeOrigem.nome, ativa: estudante.cidadeOrigem.ativa } : null,
     matricula: estudante.matricula,
     previsaoConclusao: estudante.previsaoConclusao.toISOString().slice(0, 10),
     statusCadastro: estudante.statusCadastro,
@@ -56,6 +60,8 @@ export function estudanteMeDto(estudante: EstudanteMe) {
     usuario: {
       id: usuario.id, nome: usuario.nome, email: usuario.email, telefone: usuario.telefone,
       perfil: usuario.perfil, status: usuario.status,
+      dataNascimento: usuario.dataNascimento?.toISOString().slice(0, 10) ?? null,
+      fotoUrl: usuario.fotoChave ? `/api/v1/usuarios/${usuario.id}/foto` : null,
     },
     unidadeEnsino: {
       id: unidadeEnsino.id, nome: unidadeEnsino.nome, endereco: unidadeEnsino.endereco,

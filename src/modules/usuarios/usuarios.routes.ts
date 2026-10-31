@@ -1,12 +1,19 @@
 import { Router } from "express";
 import { verificarToken, exigirOperador } from "../../shared/middlewares/auth";
 import * as controller from "./usuarios.controller";
+import { receberFoto } from "./usuarios-foto.upload";
+import { limitarTentativas } from "../../shared/middlewares/rate-limit";
 
 const router = Router();
 router.use(verificarToken);
 router.get("/me", controller.me);
-router.patch("/me", controller.atualizarMe);
+router.patch("/me", exigirOperador, controller.atualizarMe);
+router.get("/me/foto", controller.consultarFoto);
+router.get("/:id/foto", controller.consultarFoto);
 router.use(exigirOperador);
+router.patch("/:id/dados", controller.atualizarDados);
+router.put("/:id/foto", limitarTentativas(30), receberFoto, controller.alterarFoto);
+router.delete("/:id/foto", controller.removerFoto);
 router.post("/", controller.criar);
 router.get("/", controller.listar);
 router.get("/:id", controller.consultar);
