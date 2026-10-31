@@ -4,6 +4,7 @@ import authRouter from "./modules/auth/auth.routes";
 import viagensRouter from "./modules/viagens/viagens.routes";
 import avisosRouter from "./modules/avisos/avisos.routes";
 import { errorHandler } from "./shared/errors/error-handler";
+import estudantesRouter from "./modules/estudantes/estudantes.routes";
 
 const app = express();
 
@@ -18,9 +19,9 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/usuarios", usuariosRouter);
 app.use("/api/v1/viagens", viagensRouter);
 app.use("/api/v1/avisos", avisosRouter);
-// Compatibilidade temporária para os clientes existentes.
 app.use("/usuarios", authRouter, usuariosRouter);
 app.use((_req, res) => { res.status(404).json({ erro: "Rota não encontrada" }); });
 app.use(errorHandler);
+app.use("/api/v1/estudantes", estudantesRouter);
 
 export default app;
