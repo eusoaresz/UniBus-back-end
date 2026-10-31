@@ -7,6 +7,7 @@ import { carteiraRouter, operadorCarteiraRouter } from "./modules/carteira/carte
 import { errorHandler } from "./shared/errors/error-handler";
 import estudantesRouter from "./modules/estudantes/estudantes.routes";
 import operacaoRouter from "./modules/operacao/operacao.routes";
+import preferenciasRouter from "./modules/preferencias/preferencias.routes";
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use("/api/v1/viagens", viagensRouter);
 app.use("/api/v1/avisos", avisosRouter);
 app.use("/api/v1/estudantes", estudantesRouter);
 app.use("/api/v1/operacao", operacaoRouter);
+app.use("/api/v1/preferencias", preferenciasRouter);
 app.use("/api/v1/carteira", carteiraRouter);
 app.use("/api/v1/operador", operadorCarteiraRouter);
 app.use("/usuarios", authRouter, usuariosRouter);

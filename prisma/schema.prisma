@@ -168,6 +168,8 @@ model Usuario {
   nome                    String
   cpf                     String        @unique @db.VarChar(11)
   email                   String        @unique
+  dataNascimento          DateTime? @db.Date
+  fotoChave               String? @db.VarChar(36)
   telefone                String
   senhaHash               String?
   deveAlterarSenha        Boolean       @default(true)
@@ -188,6 +190,9 @@ model Usuario {
   tokensAcesso TokenAcesso[]
 
   estudante Estudante?
+  preferencias Preferencias?
+  alteracoesPerfil AlteracaoPerfil[] @relation("AlvoPerfil")
+  alteracoesPerfilRealizadas AlteracaoPerfil[] @relation("AutorPerfil")
 
   estudantesAnalisados Estudante[] @relation("AnaliseEstudante")
 
@@ -257,6 +262,9 @@ model TokenAcesso {
 model Estudante {
   id String @id @default(uuid()) @db.Uuid
 
+  curso             String? @db.VarChar(150)
+  cidadeOrigemId    String? @db.Uuid
+  cidadeOrigem      Cidade? @relation(fields: [cidadeOrigemId], references: [id], onDelete: Restrict)
   matricula         String
   previsaoConclusao DateTime                @db.Date
   statusCadastro    StatusCadastroEstudante @default(PENDENTE)
@@ -406,6 +414,46 @@ model Rota {
   escalas EscalaSemanal[]
 
   viagens Viagem[]
+  preferencias PreferenciaRota[]
+}
+
+model Cidade {
+  id String @id @default(uuid()) @db.Uuid
+  nome String @unique
+  ativa Boolean @default(true)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+  preferencias PreferenciaCidade[]
+  estudantesOrigem Estudante[]
+}
+
+model Preferencias {
+  id String @id @default(uuid()) @db.Uuid
+  usuarioId String @unique @db.Uuid
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  turnos Turno[] @default([])
+  rotas PreferenciaRota[]
+  cidades PreferenciaCidade[]
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model PreferenciaRota {
+  preferenciasId String @db.Uuid
+  rotaId String @db.Uuid
+  preferencias Preferencias @relation(fields: [preferenciasId], references: [id], onDelete: Cascade)
+  rota Rota @relation(fields: [rotaId], references: [id], onDelete: Cascade)
+  @@id([preferenciasId, rotaId])
+  @@index([rotaId])
+}
+
+model PreferenciaCidade {
+  preferenciasId String @db.Uuid
+  cidadeId String @db.Uuid
+  preferencias Preferencias @relation(fields: [preferenciasId], references: [id], onDelete: Cascade)
+  cidade Cidade @relation(fields: [cidadeId], references: [id], onDelete: Restrict)
+  @@id([preferenciasId, cidadeId])
+  @@index([cidadeId])
 }
 
 model RotaParada {
@@ -1043,4 +1091,19 @@ model ConvocacaoVan {
   criadoEm DateTime @default(now()) @db.Timestamptz(3)
   @@index([trechoId, status])
   @@index([motoristaId, status])
+}
+
+
+model AlteracaoPerfil {
+  id String @id @default(uuid()) @db.Uuid
+  usuarioId String @db.Uuid
+  usuario Usuario @relation("AlvoPerfil", fields: [usuarioId], references: [id], onDelete: Restrict)
+  realizadaPorId String @db.Uuid
+  realizadaPor Usuario @relation("AutorPerfil", fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  motivo String
+  dadosAnteriores Json
+  dadosNovos Json
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([usuarioId, criadoEm])
+  @@index([realizadaPorId])
 }
