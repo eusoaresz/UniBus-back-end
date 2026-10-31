@@ -32,12 +32,12 @@ export async function verificarToken(req: ReqUsuario, res: Response, next: NextF
   try {
     const usuario = await prisma.usuario.findUnique({
       where: { id: usuarioId },
-      select: { id: true, email: true, perfil: true, status: true },
+      select: { id: true, email: true, perfil: true, status: true, bloqueioDisciplinarAte: true },
     });
     if (!usuario) {
       return res.status(401).json({ erro: "Token inválido ou expirado" });
     }
-    if (usuario.status !== "ATIVA") {
+    if (usuario.status !== "ATIVA" || (usuario.bloqueioDisciplinarAte && usuario.bloqueioDisciplinarAte > new Date())) {
       return res.status(403).json({ erro: "Conta sem permissão para acesso" });
     }
     req.usuarioId = usuario.id;

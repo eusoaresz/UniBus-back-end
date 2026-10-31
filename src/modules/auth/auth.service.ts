@@ -14,11 +14,11 @@ export const mensagemRecuperacao = "Se o e-mail estiver cadastrado, você recebe
 
 export async function login({ email, senha }: z.infer<typeof loginSchema>) {
   const usuario = await prisma.usuario.findUnique({
-    where: { email }, select: { id: true, senhaHash: true, status: true },
+    where: { email }, select: { id: true, senhaHash: true, status: true, bloqueioDisciplinarAte: true },
   });
   const valida = await bcrypt.compare(senha, usuario?.senhaHash ?? await hashFicticio);
   if (!usuario || !usuario.senhaHash || !valida) throw new HttpError(401, "Email ou senha inválidos");
-  if (usuario.status !== "ATIVA") throw new HttpError(403, "Conta sem permissão para acesso");
+  if (usuario.status !== "ATIVA" || (usuario.bloqueioDisciplinarAte && usuario.bloqueioDisciplinarAte > new Date())) throw new HttpError(403, "Conta sem permissão para acesso");
   return { token: jwt.sign({ id: usuario.id }, JWT_SECRET, { algorithm: "HS256", expiresIn: "1h" }) };
 }
 
