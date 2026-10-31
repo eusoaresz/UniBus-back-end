@@ -7,7 +7,9 @@ export function limitarTentativas(maximo: number, janelaMs = 15 * 60 * 1000): Re
     const agora = Date.now();
     for (const [chave, valor] of registros) if (valor.expira <= agora) registros.delete(chave);
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
-    const chaves = [`ip:${req.ip ?? "desconhecido"}`, `email:${createHash("sha256").update(email).digest("hex")}`];
+    const chaves = [`ip:${req.ip ?? "desconhecido"}`];
+    // Uploads não têm e-mail no body: não criar uma chave vazia compartilhada por todos.
+    if (email) chaves.push(`email:${createHash("sha256").update(email).digest("hex")}`);
     for (const chave of chaves) {
       const registro = registros.get(chave);
       if (registro && registro.quantidade >= maximo) {

@@ -32,7 +32,6 @@ export const criarUsuarioSchema = z.strictObject({
   senha: senhaSchema,
   perfil: z.enum(["ESTUDANTE", "MOTORISTA", "OPERADOR"]),
 });
-// E-mail, CPF e perfil exigem fluxos próprios; não são alterados por mass assignment.
 export const atualizarMeSchema = z.strictObject({ nome: nome.optional(), telefone: telefone.optional() })
   .refine((dados) => Object.keys(dados).length > 0, "Informe nome ou telefone");
 export const listarUsuariosSchema = z.strictObject({

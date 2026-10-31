@@ -1,13 +1,23 @@
-import { Router } from "express";
-import {verificarToken,exigirOperador,} from "../../shared/middlewares/auth";
+import { Router, type RequestHandler } from "express";
+import { verificarToken, exigirOperador, type ReqUsuario } from "../../shared/middlewares/auth";
 import * as controller from "./estudantes.controller";
+import { receberComprovante } from "./estudantes.upload";
+import { limitarTentativas } from "../../shared/middlewares/rate-limit";
 
 const router = Router();
 
 router.use(verificarToken);
-router.get("/me", controller.me);
-router.get("/me/comprovantes",controller.listarMeusComprovantes,);
-router.post("/me/comprovantes",controller.enviarComprovante,);
+// Verifica o perfil antes de receber arquivos ou consultar informações acadêmicas próprias.
+const exigirEstudante: RequestHandler = (req, res, next) => {
+  if ((req as ReqUsuario).usuarioPerfil !== "ESTUDANTE") {
+    res.status(403).json({ erro: "Acesso restrito a estudantes" });
+    return;
+  }
+  next();
+};
+router.get("/me", exigirEstudante, controller.me);
+router.get("/me/comprovantes", exigirEstudante, controller.listarMeusComprovantes);
+router.post("/me/comprovantes", exigirEstudante, limitarTentativas(10), receberComprovante, controller.enviarComprovante);
 router.use(exigirOperador);
 router.post("/", controller.criar);
 router.get("/", controller.listar);

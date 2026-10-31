@@ -33,6 +33,5 @@ export function atualizarMe(id: string, dados: z.infer<typeof atualizarMeSchema>
 
 export function alterarStatus(id: string, operadorId: string, dados: z.infer<typeof statusSchema>) {
   if (id === operadorId) throw new HttpError(409, "Não é permitido alterar o próprio status nesta rota");
-  // Desativação preserva vínculos financeiros e operacionais; não há DELETE físico.
   return prisma.usuario.update({ where: { id }, data: { status: dados.status }, select: usuarioSelect });
 }
