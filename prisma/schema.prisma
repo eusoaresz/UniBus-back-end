@@ -174,6 +174,7 @@ model Usuario {
   senhaTemporariaExpiraEm DateTime?     @db.Timestamptz(3)
   perfil                  PerfilUsuario
   status                  StatusConta   @default(AGUARDANDO_ATIVACAO)
+  bloqueioDisciplinarAte   DateTime? @db.Timestamptz(3)
   emailVerificadoEm       DateTime?     @db.Timestamptz(3)
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
@@ -228,6 +229,11 @@ model Usuario {
 
   notificacoes Notificacao[]
 
+  semestresCriados SemestreLetivo[]
+  faltasAnalisadas Falta[] @relation("AnaliseFalta")
+  advertenciasLiberadas Advertencia[] @relation("LiberacaoAdvertencia")
+  convocacoesCriadas ConvocacaoVan[]
+
   @@index([cadastradoPorId])
 }
 
@@ -273,6 +279,9 @@ model Estudante {
 
   participacoes ParticipacaoTrecho[]
 
+  faltas Falta[]
+  advertencias Advertencia[]
+
   carteira Carteira?
 
   @@unique([unidadeEnsinoId, matricula])
@@ -293,6 +302,8 @@ model Motorista {
 
   usuarioId String  @unique @db.Uuid
   usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  convocacoes ConvocacaoVan[]
 
   escalas EscalaSemanal[]
 
@@ -431,6 +442,8 @@ model Veiculo {
 
   escalas EscalaSemanal[]
 
+  convocacoes ConvocacaoVan[]
+
   trechos TrechoViagem[] @relation("VeiculoTrecho")
 
   trechosExtras TrechoViagem[] @relation("VeiculoExtraTrecho")
@@ -543,6 +556,8 @@ model TrechoViagem {
 
   canceladoPorId String?  @db.Uuid
   canceladoPor   Usuario? @relation("CancelamentoTrecho", fields: [canceladoPorId], references: [id], onDelete: Restrict)
+
+  convocacoes ConvocacaoVan[]
 
   paradas ParadaTrecho[]
 
@@ -665,11 +680,14 @@ model ParticipacaoTrecho {
   confirmadaPorId   String?                @db.Uuid
   confirmadaPor     Usuario?               @relation("ConfirmacaoOperador", fields: [confirmadaPorId], references: [id], onDelete: Restrict)
   motivoExcecao     String?
+  confirmacaoTardia Boolean @default(false)
   limiteEstornoEm   DateTime?              @db.Timestamptz(3)
   cicloConfirmacao  Int                    @default(0)
   movimentacoes     MovimentacaoCarteira[]
 
   alteracoes AlteracaoParticipacao[]
+
+  falta Falta?
 
   embarques Embarque[]
 
@@ -952,4 +970,77 @@ model EntregaNotificacao {
   @@index([status, agendadaPara])
   @@index([notificacaoId])
   @@index([dispositivoId])
+}
+
+
+model SemestreLetivo {
+  id String @id @default(uuid()) @db.Uuid
+  nome String
+  inicio DateTime @db.Timestamptz(3)
+  fim DateTime @db.Timestamptz(3)
+  criadoPorId String @db.Uuid
+  criadoPor Usuario @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  faltas Falta[]
+  advertencias Advertencia[]
+  @@index([inicio, fim])
+}
+
+model Falta {
+  id String @id @default(uuid()) @db.Uuid
+  participacaoId String @unique @db.Uuid
+  participacao ParticipacaoTrecho @relation(fields: [participacaoId], references: [id], onDelete: Restrict)
+  estudanteId String @db.Uuid
+  estudante Estudante @relation(fields: [estudanteId], references: [id], onDelete: Restrict)
+  semestreId String @db.Uuid
+  semestre SemestreLetivo @relation(fields: [semestreId], references: [id], onDelete: Restrict)
+  justificativa String?
+  justificada Boolean @default(false)
+  analisadoEm DateTime? @db.Timestamptz(3)
+  analisadoPorId String? @db.Uuid
+  analisadoPor Usuario? @relation("AnaliseFalta", fields: [analisadoPorId], references: [id], onDelete: Restrict)
+  motivoAnalise String?
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([estudanteId, semestreId, justificada])
+}
+
+model Advertencia {
+  id String @id @default(uuid()) @db.Uuid
+  estudanteId String @db.Uuid
+  estudante Estudante @relation(fields: [estudanteId], references: [id], onDelete: Restrict)
+  semestreId String @db.Uuid
+  semestre SemestreLetivo @relation(fields: [semestreId], references: [id], onDelete: Restrict)
+  numero Int
+  liberadaEm DateTime? @db.Timestamptz(3)
+  motivoLiberacao String?
+  liberadaPorId String? @db.Uuid
+  liberadaPor Usuario? @relation("LiberacaoAdvertencia", fields: [liberadaPorId], references: [id], onDelete: Restrict)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([estudanteId, semestreId, numero])
+}
+
+enum StatusConvocacaoVan {
+  PENDENTE
+  ACEITA
+  RECUSADA
+  EXPIRADA
+  CANCELADA
+}
+
+model ConvocacaoVan {
+  id String @id @default(uuid()) @db.Uuid
+  trechoId String @db.Uuid
+  trecho TrechoViagem @relation(fields: [trechoId], references: [id], onDelete: Restrict)
+  motoristaId String @db.Uuid
+  motorista Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
+  veiculoId String @db.Uuid
+  veiculo Veiculo @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
+  solicitadaPorId String @db.Uuid
+  solicitadaPor Usuario @relation(fields: [solicitadaPorId], references: [id], onDelete: Restrict)
+  status StatusConvocacaoVan @default(PENDENTE)
+  responderAte DateTime @db.Timestamptz(3)
+  respondidaEm DateTime? @db.Timestamptz(3)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([trechoId, status])
+  @@index([motoristaId, status])
 }
