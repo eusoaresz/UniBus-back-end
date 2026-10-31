@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import type { z } from "zod";
 import { fileTypeFromBuffer } from "file-type";
 import { Prisma } from "../../../generated/prisma";
@@ -42,42 +43,32 @@ async function comTransacao<T>(operacao: (tx: Prisma.TransactionClient) => Promi
   }
 }
 
-async function validarCadastro(tx: Prisma.TransactionClient, dados: DadosCriacao) {
-  const usuario = await tx.usuario.findUnique({
-    where: { id: dados.usuarioId },
-    select: { id: true, perfil: true, estudante: { select: { id: true } } },
-  });
-  if (!usuario) throw new HttpError(404, "Usuário não encontrado");
-  if (usuario.perfil !== "ESTUDANTE") {
-    throw new HttpError(409, "O usuário informado não possui perfil de estudante");
-  }
-  if (usuario.estudante) throw new HttpError(409, "O usuário já possui cadastro acadêmico");
-
-  const matriculaExistente = await tx.estudante.findFirst({
-    where: { matricula: dados.matricula },
-    select: { id: true },
-  });
-  if (matriculaExistente) throw new HttpError(409, "A matrícula já está cadastrada");
-
+async function validarUnidade(tx: Prisma.TransactionClient, unidadeEnsinoId: string) {
   const unidade = await tx.unidadeEnsino.findUnique({
-    where: { id: dados.unidadeEnsinoId },
-    select: { id: true, ativa: true, instituicaoEnsino: { select: { ativa: true } } },
+    where: { id: unidadeEnsinoId },
+    select: { ativa: true, instituicaoEnsino: { select: { ativa: true } }, pontoParada: { select: { ativo: true } } },
   });
   if (!unidade) throw new HttpError(404, "Unidade de ensino não encontrada");
-  if (!unidade.ativa || !unidade.instituicaoEnsino.ativa) {
-    throw new HttpError(409, "A unidade de ensino está inativa");
+  if (!unidade.ativa || !unidade.instituicaoEnsino.ativa || !unidade.pontoParada.ativo) {
+    throw new HttpError(409, "Unidade de ensino indisponível");
   }
 }
 
-export async function criarEstudante(dados: DadosCriacao) {
+export async function criarEstudante(dados: DadosCriacao, operadorId: string) {
+  const { senha, matricula, unidadeEnsinoId, previsaoConclusao, ...usuario } = dados;
+  const senhaHash = await bcrypt.hash(senha, 10);
   return comTransacao(async (tx) => {
-    await validarCadastro(tx, dados);
+    await validarUnidade(tx, unidadeEnsinoId);
     const estudante = await tx.estudante.create({
       data: {
-        matricula: dados.matricula,
-        previsaoConclusao: new Date(`${dados.previsaoConclusao}T00:00:00.000Z`),
-        usuarioId: dados.usuarioId,
-        unidadeEnsinoId: dados.unidadeEnsinoId,
+        matricula,
+        previsaoConclusao: new Date(previsaoConclusao),
+        unidadeEnsino: { connect: { id: unidadeEnsinoId } },
+        statusCadastro: "APROVADO",
+        analisadoEm: new Date(),
+        analisadoPor: { connect: { id: operadorId } },
+        usuario: { create: { ...usuario, perfil: "ESTUDANTE", senhaHash, cadastradoPorId: operadorId } },
+        carteira: { create: {} },
       },
       select: estudanteDetalheSelect,
     });
@@ -121,30 +112,20 @@ export async function editarEstudante(id: string, dados: DadosEdicao) {
   return comTransacao(async (tx) => {
     const atual = await tx.estudante.findUnique({
       where: { id },
-      select: { id: true, statusCadastro: true, matricula: true },
+      select: { id: true, statusCadastro: true, matricula: true, unidadeEnsinoId: true },
     });
     if (!atual) throw new HttpError(404, "Cadastro acadêmico não encontrado");
     if (atual.statusCadastro === "APROVADO") {
       throw new HttpError(409, "Cadastro aprovado não pode ser editado por esta rota");
     }
 
-    if (dados.matricula && dados.matricula !== atual.matricula) {
-      const duplicada = await tx.estudante.findFirst({
-        where: { matricula: dados.matricula, id: { not: id } },
-        select: { id: true },
-      });
-      if (duplicada) throw new HttpError(409, "A matrícula já está cadastrada");
-    }
-    if (dados.unidadeEnsinoId) {
-      const unidade = await tx.unidadeEnsino.findUnique({
-        where: { id: dados.unidadeEnsinoId },
-        select: { ativa: true, instituicaoEnsino: { select: { ativa: true } } },
-      });
-      if (!unidade) throw new HttpError(404, "Unidade de ensino não encontrada");
-      if (!unidade.ativa || !unidade.instituicaoEnsino.ativa) {
-        throw new HttpError(409, "A unidade de ensino está inativa");
-      }
-    }
+    const matricula = dados.matricula ?? atual.matricula;
+    const unidadeEnsinoId = dados.unidadeEnsinoId ?? atual.unidadeEnsinoId;
+    const duplicada = await tx.estudante.findFirst({
+      where: { matricula, unidadeEnsinoId, id: { not: id } }, select: { id: true },
+    });
+    if (duplicada) throw new HttpError(409, "A matrícula já está cadastrada nesta unidade");
+    await validarUnidade(tx, unidadeEnsinoId);
 
     const estudante = await tx.estudante.update({
       where: { id },
@@ -171,7 +152,7 @@ async function alterarStatus(
   return comTransacao(async (tx) => {
     const estudante = await tx.estudante.findUnique({
       where: { id },
-      select: { id: true, statusCadastro: true, usuarioId: true,
+      select: { id: true, statusCadastro: true, usuarioId: true, unidadeEnsinoId: true,
         usuario: { select: { perfil: true } },
         unidadeEnsino: { select: { ativa: true, instituicaoEnsino: { select: { ativa: true } } } },
       },
@@ -189,9 +170,7 @@ async function alterarStatus(
 
     if (statusCadastro === "APROVADO") {
       if (estudante.usuario.perfil !== "ESTUDANTE") throw new HttpError(409, "O usuário não possui perfil de estudante");
-      if (!estudante.unidadeEnsino.ativa || !estudante.unidadeEnsino.instituicaoEnsino.ativa) {
-        throw new HttpError(409, "A unidade de ensino está inativa");
-      }
+      await validarUnidade(tx, estudante.unidadeEnsinoId);
     }
 
     const alteracao = await tx.estudante.updateMany({
@@ -204,6 +183,9 @@ async function alterarStatus(
       },
     });
     if (alteracao.count !== 1) throw new HttpError(409, "O cadastro foi alterado simultaneamente. Tente novamente");
+    if (statusCadastro === "APROVADO") {
+      await tx.carteira.upsert({ where: { estudanteId: id }, create: { estudanteId: id }, update: {} });
+    }
     const atualizado = await tx.estudante.findUnique({ where: { id }, select: estudanteDetalheSelect });
     if (!atualizado) throw new HttpError(404, "Cadastro acadêmico não encontrado");
     return estudanteDetalheDto(atualizado);

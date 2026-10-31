@@ -7,7 +7,6 @@ import { limitarTentativas } from "../../shared/middlewares/rate-limit";
 const router = Router();
 
 router.use(verificarToken);
-// Verifica o perfil antes de receber arquivos ou consultar informações acadêmicas próprias.
 const exigirEstudante: RequestHandler = (req, res, next) => {
   if ((req as ReqUsuario).usuarioPerfil !== "ESTUDANTE") {
     res.status(403).json({ erro: "Acesso restrito a estudantes" });

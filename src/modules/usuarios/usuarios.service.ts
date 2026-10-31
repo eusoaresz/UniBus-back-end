@@ -6,6 +6,7 @@ import { criarUsuarioSchema, atualizarMeSchema, listarUsuariosSchema, statusSche
 import { usuarioSelect, usuarioListaSelect } from "./usuarios.dto";
 
 export async function criarUsuario(dados: z.infer<typeof criarUsuarioSchema>, operadorId: string) {
+  if (dados.perfil === "ESTUDANTE") throw new HttpError(409, "Cadastre o estudante em /api/v1/estudantes com os dados acadêmicos para criar sua carteira");
   const { senha, ...usuario } = dados;
   return prisma.usuario.create({
     data: { ...usuario, senhaHash: await bcrypt.hash(senha, 10), cadastradoPorId: operadorId },

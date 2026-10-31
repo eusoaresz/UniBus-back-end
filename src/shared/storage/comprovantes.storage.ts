@@ -2,7 +2,6 @@ import { mkdir, writeFile, unlink } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { randomUUID } from "node:crypto";
 
-// Não montar este diretório com express.static. Apenas nomes gerados internamente.
 export const comprovantesStorage = {
   async salvar(conteudo: Buffer) {
     const diretorio = resolve(process.env.COMPROVANTES_DIR ?? ".private/comprovantes");

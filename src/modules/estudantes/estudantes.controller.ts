@@ -5,7 +5,7 @@ import * as service from "./estudantes.service";
 import { HttpError } from "../../shared/errors/http-error";
 
 export async function criar(req: ReqUsuario, res: Response) {
-  res.status(201).json(await service.criarEstudante(schemas.criarEstudanteSchema.parse(req.body)));
+  res.status(201).json(await service.criarEstudante(schemas.criarEstudanteSchema.parse(req.body), req.usuarioId!));
 }
 
 export async function me(req: ReqUsuario, res: Response) {

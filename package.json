@@ -1,6 +1,7 @@
 {
   "devDependencies": {
     "@electric-sql/pglite": "^0.4.3",
+    "@prisma/driver-adapter-utils": "^7.10.1",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
@@ -25,6 +26,7 @@
     "zod": "^4.6.7"
   },
   "scripts": {
+    "seed:local": "tsx scripts/seed-local.ts",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "prisma:generate": "prisma generate",

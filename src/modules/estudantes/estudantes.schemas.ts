@@ -1,11 +1,11 @@
 import { z } from "zod";
+import { criarUsuarioSchema } from "../usuarios/usuarios.schemas";
 
 const matricula = z.string().trim().min(1).max(50);
 const unidadeEnsinoId = z.string().uuid();
 const previsaoConclusao = z.iso.date();
 
-export const criarEstudanteSchema = z.strictObject({
-  usuarioId: z.string().uuid(),
+export const criarEstudanteSchema = criarUsuarioSchema.omit({ perfil: true }).extend({
   matricula,
   previsaoConclusao,
   unidadeEnsinoId,

@@ -3,6 +3,7 @@ import usuariosRouter from "./modules/usuarios/usuarios.routes";
 import authRouter from "./modules/auth/auth.routes";
 import viagensRouter from "./modules/viagens/viagens.routes";
 import avisosRouter from "./modules/avisos/avisos.routes";
+import { carteiraRouter, operadorCarteiraRouter } from "./modules/carteira/carteira.routes";
 import { errorHandler } from "./shared/errors/error-handler";
 import estudantesRouter from "./modules/estudantes/estudantes.routes";
 
@@ -20,6 +21,8 @@ app.use("/api/v1/usuarios", usuariosRouter);
 app.use("/api/v1/viagens", viagensRouter);
 app.use("/api/v1/avisos", avisosRouter);
 app.use("/api/v1/estudantes", estudantesRouter);
+app.use("/api/v1/carteira", carteiraRouter);
+app.use("/api/v1/operador", operadorCarteiraRouter);
 app.use("/usuarios", authRouter, usuariosRouter);
 app.use((_req, res) => { res.status(404).json({ erro: "Rota não encontrada" }); });
 app.use(errorHandler);

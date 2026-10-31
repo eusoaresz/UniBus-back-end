@@ -23,6 +23,7 @@ export const estudanteMeSelect = {
 
 export const estudanteDetalheSelect = {
   ...estudanteMeSelect,
+  carteira: { select: { id: true, saldo: true, limiteCredito: true } },
   observacaoAnalise: true,
   analisadoPor: { select: { id: true, nome: true } },
 } satisfies Prisma.EstudanteSelect;
@@ -69,6 +70,11 @@ export function estudanteMeDto(estudante: EstudanteMe) {
 export function estudanteDetalheDto(estudante: EstudanteDetalhe) {
   return {
     ...estudanteMeDto(estudante),
+    carteira: estudante.carteira ? {
+      id: estudante.carteira.id,
+      saldo: estudante.carteira.saldo.toFixed(2),
+      limiteCredito: estudante.carteira.limiteCredito.toFixed(2),
+    } : null,
     observacaoAnalise: estudante.observacaoAnalise,
     analisadoPor: estudante.analisadoPor
       ? { id: estudante.analisadoPor.id, nome: estudante.analisadoPor.nome }
