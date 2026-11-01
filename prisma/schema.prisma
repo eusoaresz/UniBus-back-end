@@ -238,6 +238,7 @@ model Usuario {
   dispositivos DispositivoUsuario[]
 
   notificacoes Notificacao[]
+  preferenciasNotificacao PreferenciasNotificacao?
 
   semestresCriados SemestreLetivo[]
   faltasAnalisadas Falta[] @relation("AnaliseFalta")
@@ -998,6 +999,8 @@ model Notificacao {
   id String @id @default(uuid()) @db.Uuid
 
   tipo              String
+  tema              String @default("OPERACAO") @db.VarChar(32)
+  alertaHabilitado   Boolean @default(true)
   titulo            String
   mensagem          String
   dados             Json?
@@ -1016,8 +1019,25 @@ model Notificacao {
   entregas EntregaNotificacao[]
 
   @@index([usuarioId, criadoEm])
+  @@index([usuarioId, alertaHabilitado, lidaEm])
   @@index([usuarioId])
   @@index([avisoId])
+}
+
+model PreferenciasNotificacao {
+  usuarioId String @id @db.Uuid
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  ativadas Boolean @default(true)
+  confirmacoes Boolean @default(true)
+  alteracoesRota Boolean @default(true)
+  cancelamentos Boolean @default(true)
+  lembretes Boolean @default(true)
+  avisosOperador Boolean @default(true)
+  novidades Boolean @default(true)
+  carteira Boolean @default(true)
+  disciplina Boolean @default(true)
+  operacao Boolean @default(true)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model EntregaNotificacao {
