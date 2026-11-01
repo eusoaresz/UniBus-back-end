@@ -62,4 +62,4 @@ export const listarUsuariosSchema = z.strictObject({
   status: z.enum(["AGUARDANDO_ATIVACAO", "ATIVA", "BLOQUEADA", "INATIVA"]).optional(),
 });
 export const idSchema = z.string().uuid();
-export const statusSchema = z.strictObject({ status: z.enum(["ATIVA", "BLOQUEADA", "INATIVA"]) });
+export const statusSchema = z.strictObject({ status: z.enum(["ATIVA", "BLOQUEADA", "INATIVA"]), motivo: z.string().trim().min(3).max(1000) });

@@ -32,7 +32,7 @@ export async function verificarToken(req: ReqUsuario, res: Response, next: NextF
   try {
     const usuario = await prisma.usuario.findUnique({
       where: { id: usuarioId },
-      select: { id: true, email: true, perfil: true, status: true, bloqueioDisciplinarAte: true },
+      select: { id: true, email: true, perfil: true, status: true, bloqueioDisciplinarAte: true, estudante: { select: { statusCadastro: true } } },
     });
     if (!usuario) {
       return res.status(401).json({ erro: "Token inválido ou expirado" });
@@ -41,6 +41,9 @@ export async function verificarToken(req: ReqUsuario, res: Response, next: NextF
       return res.status(403).json({ erro: "Conta sem permissão para acesso" });
     }
     req.usuarioId = usuario.id;
+    if (usuario.perfil === "ESTUDANTE" && usuario.estudante?.statusCadastro === "ENCERRADO" && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+      return res.status(403).json({ erro: "Cadastro encerrado permite somente consultas" });
+    }
     req.usuarioEmail = usuario.email;
     req.usuarioPerfil = usuario.perfil;
   } catch (error) {

@@ -1,3 +1,5 @@
+import { alterarEncerramento } from "./estudantes-encerramento.service";
+import { estudanteIdSchema, justificarEstudanteSchema } from "./estudantes.schemas";
 import { Router, type RequestHandler } from "express";
 import { verificarToken, exigirOperador, type ReqUsuario } from "../../shared/middlewares/auth";
 import * as controller from "./estudantes.controller";
@@ -19,6 +21,12 @@ router.get("/me/comprovantes", exigirEstudante, controller.listarMeusComprovante
 router.post("/me/comprovantes", exigirEstudante, limitarTentativas(10), receberComprovante, controller.enviarComprovante);
 router.use(exigirOperador);
 router.post("/", controller.criar);
+for (const acao of ["encerrar", "reabrir"] as const) {
+  router.post(`/:id/${acao}`, async (req: ReqUsuario, res) => {
+    const { motivo } = justificarEstudanteSchema.parse(req.body);
+    res.json(await alterarEncerramento(estudanteIdSchema.parse(req.params.id), req.usuarioId!, motivo, acao === "reabrir"));
+  });
+}
 router.get("/", controller.listar);
 router.get("/:id", controller.consultar);
 router.patch("/:id", controller.editar);

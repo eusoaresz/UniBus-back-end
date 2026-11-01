@@ -80,6 +80,7 @@ export function publicar(id: string, atorId: string) {
     const viagem = await tx.viagem.findUnique({ where: { id }, include: { trechos: true, rota: { include: { paradas: { include: { pontoParada: true } } } } } });
     exigir(viagem, "Viagem não encontrada", 404);
     if (viagem.status === "PROGRAMADA") return viagem;
+    exigir(!viagem.revisaoRotaPendente, "Revise e salve o rascunho após a alteração da rota antes de publicar");
     exigir(viagem.status === "RASCUNHO" && viagem.trechos.length === 2 && new Set(viagem.trechos.map((t) => t.sentido)).size === 2, "Publicação exige ida e volta em rascunho");
     const ida = viagem.trechos.find((t) => t.sentido === "IDA")!;
     const volta = viagem.trechos.find((t) => t.sentido === "VOLTA")!;

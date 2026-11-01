@@ -1,3 +1,4 @@
+import { transacaoPerfil } from "../usuarios/usuarios-dados.service";
 import type { z } from "zod";
 import type { Prisma } from "../../../generated/prisma";
 import { prisma } from "../../../lib/prisma";
@@ -14,7 +15,6 @@ type FiltrosAvisos = z.infer<typeof listarAvisosSchema>;
 
 function visibilidade(perfil: string): Prisma.AvisoWhereInput {
   const agora = new Date();
-  // Falha fechada para perfis desconhecidos, sem cast de entrada para enum.
   const publico = perfil === "ESTUDANTE" || perfil === "MOTORISTA" || perfil === "OPERADOR" ? perfil : undefined;
   if (!publico) throw new HttpError(403, "Perfil sem permissão para acesso");
   return {
@@ -27,17 +27,14 @@ function visibilidade(perfil: string): Prisma.AvisoWhereInput {
   };
 }
 
+const auditoriaJson = (valor: object): Prisma.InputJsonObject => JSON.parse(JSON.stringify(valor));
 export function criarAviso(dados: z.infer<typeof criarAvisoSchema>, operadorId: string) {
-  return prisma.aviso.create({
-    data: {
-      ...dados,
-      expiraEm: dados.expiraEm ? new Date(dados.expiraEm) : null,
-      publicadoPorId: operadorId,
-    },
-    select: avisoSelect,
+  return transacaoPerfil(operadorId, async tx => {
+    const aviso = await tx.aviso.create({ data: { ...dados, expiraEm: dados.expiraEm ? new Date(dados.expiraEm) : null, publicadoPorId: operadorId }, select: avisoSelect });
+    await tx.alteracaoAviso.create({ data: { avisoId: aviso.id, realizadaPorId: operadorId, motivo: "Publicação de aviso", dadosAnteriores: {}, dadosNovos: auditoriaJson(aviso) } });
+    return aviso;
   });
 }
-
 export async function listarAvisos(
   filtros: FiltrosAvisos,
   perfil: string,
@@ -83,26 +80,23 @@ export async function consultarGestao(id: string) {
   return aviso;
 }
 
-export async function editarAviso(id: string, dados: z.infer<typeof editarAvisoSchema>) {
-  await consultarGestao(id);
-  return prisma.aviso.update({
-    where: { id },
-    data: {
-      ...dados,
-      expiraEm: dados.expiraEm === undefined
-        ? undefined
-        : dados.expiraEm
-          ? new Date(dados.expiraEm)
-          : null,
-    },
-    select: avisoSelect,
+export function editarAviso(id: string, dados: z.infer<typeof editarAvisoSchema>, operadorId: string) {
+  return transacaoPerfil(operadorId, async tx => {
+    const anterior = await tx.aviso.findUnique({ where: { id }, select: avisoSelect });
+    if (!anterior) throw new HttpError(404, "Aviso não encontrado");
+    const { motivo, ...campos } = dados;
+    const novo = await tx.aviso.update({ where: { id }, data: { ...campos,
+      expiraEm: campos.expiraEm === undefined ? undefined : campos.expiraEm ? new Date(campos.expiraEm) : null }, select: avisoSelect });
+    await tx.alteracaoAviso.create({ data: { avisoId: id, realizadaPorId: operadorId, motivo, dadosAnteriores: auditoriaJson(anterior), dadosNovos: auditoriaJson(novo) } });
+    return novo;
   });
 }
-
-export async function alterarStatus(
-  id: string,
-  dados: z.infer<typeof alterarStatusAvisoSchema>,
-) {
-  await consultarGestao(id);
-  return prisma.aviso.update({ where: { id }, data: dados, select: avisoSelect });
+export function alterarStatus(id: string, dados: z.infer<typeof alterarStatusAvisoSchema>, operadorId: string) {
+  return transacaoPerfil(operadorId, async tx => {
+    const anterior = await tx.aviso.findUnique({ where: { id }, select: avisoSelect });
+    if (!anterior) throw new HttpError(404, "Aviso não encontrado");
+    const novo = await tx.aviso.update({ where: { id }, data: { ativo: dados.ativo }, select: avisoSelect });
+    await tx.alteracaoAviso.create({ data: { avisoId: id, realizadaPorId: operadorId, motivo: dados.motivo, dadosAnteriores: auditoriaJson(anterior), dadosNovos: auditoriaJson(novo) } });
+    return novo;
+  });
 }

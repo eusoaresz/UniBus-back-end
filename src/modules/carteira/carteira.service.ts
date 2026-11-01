@@ -24,7 +24,7 @@ export function serializar(valor: unknown): any {
 export async function carteiraPropria(usuarioId: string) {
   const estudante = await prisma.estudante.findUnique({ where: { usuarioId }, include: { carteira: true } });
   if (!estudante?.carteira) throw new HttpError(404, "Cadastro de estudante ou carteira não encontrado");
-  if (!["APROVADO", "SUSPENSO"].includes(estudante.statusCadastro)) throw new HttpError(403, "Cadastro sem acesso à carteira");
+  if (!["APROVADO", "SUSPENSO", "ENCERRADO"].includes(estudante.statusCadastro)) throw new HttpError(403, "Cadastro sem acesso à carteira");
   return estudante.carteira;
 }
 
@@ -70,6 +70,8 @@ export async function listarRecargas(filtro: z.infer<typeof schemas.recargasFilt
 
 export function solicitarRecarga(carteiraId: string, usuarioId: string, dados: z.infer<typeof schemas.recargaSchema>) {
   return executarTransacao(prisma, async (tx) => {
+    const estudante = await tx.estudante.findUnique({ where: { usuarioId }, select: { statusCadastro: true, carteira: { select: { id: true } } } });
+    if (!estudante || !["APROVADO", "SUSPENSO"].includes(estudante.statusCadastro) || estudante.carteira?.id !== carteiraId) throw new HttpError(403, "Cadastro sem permissão para solicitar recarga");
     const chave = `recarga:${usuarioId}:${dados.chaveIdempotencia}`;
     const existente = await tx.recarga.findUnique({ where: { chaveIdempotencia: chave }, include: recargaInclude });
     if (existente) {

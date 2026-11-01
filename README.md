@@ -33,7 +33,7 @@ Consulte [o contrato e os testes de usuários](docs/usuarios.md) e [as requisiç
 | POST | `/usuarios/recuperar-senha` | Público |
 | POST | `/usuarios/redefinir-senha` | Público; exige código válido |
 
-Nas rotas protegidas, envie `Authorization: Bearer <token>`. O cadastro recebe `nome`, `cpf` (11 dígitos), `email`, `telefone`, `senha` e `perfil` (`MOTORISTA` ou `OPERADOR`). A senha exige pelo menos oito caracteres, maiúscula, minúscula, número e símbolo.
+Nas rotas protegidas, envie `Authorization: Bearer <token>`. O cadastro recebe `nome`, `cpf` (11 dígitos), `email`, `telefone`, `senha` e `perfil` (`OPERADOR`). A senha exige pelo menos oito caracteres, maiúscula, minúscula, número e símbolo.
 
 O login recebe `email` e `senha`; a solicitação de recuperação recebe `email`; a redefinição recebe `email`, `codigo` de seis dígitos e `novaSenha`.
 
@@ -49,3 +49,11 @@ O login recebe `email` e `senha`; a solicitação de recuperação recebe `email
 Essas verificações não substituem testes com banco e SMTP reais.
 
 Veja também [as dependências](docs/dependencias.md). Versione schema, migrações e `package-lock.json`; mantenha credenciais, `node_modules`, cliente gerado e logs fora do Git.
+
+O cadastro completo de motorista usa /api/v1/motoristas, incluindo CNH e conta já ativa. Consulte [cadastro de motoristas](docs/motoristas.md) para complemento de contas existentes, edição e desativação com histórico.
+
+A gestão de veículos usa /api/v1/veiculos, restrita a operadores. Consulte [cadastro de veículos](docs/veiculos.md) para os contratos, histórico e regras de desativação.
+
+Os cadastros de instituições, unidades e pontos usam /api/v1/instituicoes, /api/v1/unidades-ensino e /api/v1/pontos-parada. Consulte [cadastros de ensino](docs/ensino.md) para vínculos, histórico e desativação.
+
+Rotas e cidades são administradas em /api/v1/rotas e /api/v1/cidades. Consulte [catálogos](docs/catalogos.md) para a revisão obrigatória de rascunhos e a preservação de vínculos após desativação.

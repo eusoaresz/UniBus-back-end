@@ -101,6 +101,7 @@ before(async () => {
     return { ...args.data, id: estudanteId, criadoEm: data, atualizadoEm: data };
   });
   substituir(prisma, "$transaction", async (fn: any) => fn(prisma));
+  substituir(prisma.alteracaoPerfil, "create", async (args: any) => args.data);
   substituir(comprovantesStorage, "salvar", async () => {
     salvos++; return { chave: "chave-privada", remover: async () => { removidos++; } };
   });
@@ -174,20 +175,20 @@ test("cadastro cria usuário, estudante aprovado e carteira sem aceitar campos a
   jaCadastrado = true; assert.equal((await request("POST", "", dados)).status, 409);
 });
 test("aprovação registra operador e impede repetição", async () => {
-  assert.equal((await request("POST", `/${estudanteId}/aprovar`, {})).status, 200);
+  assert.equal((await request("POST", `/${estudanteId}/aprovar`, { motivo: "Aprovação presencial" })).status, 200);
   assert.equal(atualizacoes[0].where.statusCadastro, "PENDENTE");
   assert.equal(atualizacoes[0].data.analisadoPorId, operadorId);
   assert.equal(criacoesCarteira, 1);
-  assert.equal((await request("POST", `/${estudanteId}/aprovar`, {})).status, 409);
+  assert.equal((await request("POST", `/${estudanteId}/aprovar`, { motivo: "Aprovação presencial" })).status, 409);
 });
 test("conflito entre leitura e transição não sobrescreve status", async () => {
   conflito = true;
-  assert.equal((await request("POST", `/${estudanteId}/aprovar`, {})).status, 409);
+  assert.equal((await request("POST", `/${estudanteId}/aprovar`, { motivo: "Aprovação presencial" })).status, 409);
   assert.equal(estudante.statusCadastro, "PENDENTE");
 });
 test("não aprova cadastro vinculado a unidade inativa", async () => {
   estudante.unidadeEnsino.ativa = false;
-  assert.equal((await request("POST", `/${estudanteId}/aprovar`, {})).status, 409);
+  assert.equal((await request("POST", `/${estudanteId}/aprovar`, { motivo: "Aprovação presencial" })).status, 409);
   assert.equal(atualizacoes.length, 0);
 });
 test("rejeição exige motivo e suspensão exige aprovação anterior", async () => {
@@ -197,19 +198,19 @@ test("rejeição exige motivo e suspensão exige aprovação anterior", async ()
 });
 test("reativação é exclusiva de suspensos e retorna a aprovado", async () => {
   estudante.statusCadastro = "REJEITADO";
-  assert.equal((await request("POST", `/${estudanteId}/reativar`, {})).status, 409);
+  assert.equal((await request("POST", `/${estudanteId}/reativar`, { motivo: "Regularização" })).status, 409);
   estudante.statusCadastro = "SUSPENSO";
   estudante.carteira = { id: "carteira", saldo: new Prisma.Decimal("12.50"), limiteCredito: new Prisma.Decimal(20) };
-  assert.equal((await request("POST", `/${estudanteId}/reativar`, {})).status, 200);
+  assert.equal((await request("POST", `/${estudanteId}/reativar`, { motivo: "Regularização" })).status, 200);
   assert.equal(estudante.statusCadastro, "APROVADO");
   assert.equal(estudante.carteira.saldo.toFixed(2), "12.50");
   assert.equal(criacoesCarteira, 0);
 });
 test("edição converte data e impede unidade inativa", async () => {
-  assert.equal((await request("PATCH", `/${estudanteId}`, { previsaoConclusao: "2029-12-31" })).status, 200);
+  assert.equal((await request("PATCH", `/${estudanteId}`, { previsaoConclusao: "2029-12-31", motivo: "Correção" })).status, 200);
   assert.equal(estudante.previsaoConclusao.toISOString(), "2029-12-31T00:00:00.000Z");
   unidadeAtiva = false;
-  assert.equal((await request("PATCH", `/${estudanteId}`, { unidadeEnsinoId: unidadeId })).status, 409);
+  assert.equal((await request("PATCH", `/${estudanteId}`, { unidadeEnsinoId: unidadeId, motivo: "Correção" })).status, 409);
 });
 test("comprovantes são paginados e limitados ao cadastro autenticado", async () => {
   perfil = "ESTUDANTE";

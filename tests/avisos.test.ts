@@ -54,6 +54,8 @@ before(async () => {
     for (const [campo, valor] of Object.entries(args.data)) if (valor !== undefined) aviso[campo] = valor;
     return aviso;
   });
+  substituir(prisma, "$transaction", async (fn: any) => fn(prisma));
+  substituir(prisma.alteracaoAviso, "create", async (args: any) => args.data);
   const app = (await import("../src/app")).default;
   server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -76,13 +78,13 @@ async function request(method: string, path = "", body?: unknown, autenticado = 
 }
 
 test("edição parcial não injeta público nem expiração", () => {
-  assert.deepEqual(editarAvisoSchema.parse({ titulo: "Novo título" }), { titulo: "Novo título" });
+  assert.deepEqual(editarAvisoSchema.parse({ titulo: "Novo título", motivo: "Correção" }), { titulo: "Novo título", motivo: "Correção" });
   assert.equal(editarAvisoSchema.safeParse({}).success, false);
 });
 test("criação e edição rejeitam expiração passada", () => {
   assert.equal(criarAvisoSchema.safeParse({ titulo: "Título", mensagem: "Texto", expiraEm: "2020-01-01T00:00:00Z" }).success, false);
   assert.equal(editarAvisoSchema.safeParse({ expiraEm: "2020-01-01T00:00:00Z" }).success, false);
-  assert.equal(editarAvisoSchema.safeParse({ expiraEm: null }).success, true);
+  assert.equal(editarAvisoSchema.safeParse({ expiraEm: null, motivo: "Correção" }).success, true);
 });
 test("consulta exige autenticação", async () => {
   assert.equal((await request("GET", "", undefined, false)).status, 401);
@@ -114,8 +116,8 @@ for (const perfilNegado of ["ESTUDANTE", "MOTORISTA"]) {
     for (const [metodo, caminho, corpo] of [
       ["GET", "/gestao", undefined], ["GET", `/gestao/${id}`, undefined],
       ["POST", "", { titulo: "Título", mensagem: "Texto" }],
-      ["PATCH", `/${id}`, { titulo: "Novo título" }],
-      ["PATCH", `/${id}/status`, { ativo: false }],
+      ["PATCH", `/${id}`, { titulo: "Novo título", motivo: "Correção" }],
+      ["PATCH", `/${id}/status`, { ativo: false, motivo: "Arquivamento" }],
     ] as const) assert.equal((await request(metodo, caminho, corpo)).status, 403);
   });
 }
@@ -128,7 +130,7 @@ test("operador consulta arquivados e expirados na gestão", async () => {
 test("operador edita título preservando público e expiração", async () => {
   perfil = "OPERADOR";
   const expira = aviso.expiraEm.toISOString();
-  const res = await request("PATCH", `/${id}`, { titulo: "Título novo" });
+  const res = await request("PATCH", `/${id}`, { titulo: "Título novo", motivo: "Correção" });
   assert.equal(res.status, 200);
   const dados = await res.json() as any;
   assert.equal(dados.publicoPerfil, "ESTUDANTE"); assert.equal(dados.expiraEm, expira);
@@ -138,7 +140,7 @@ test("operador cria e arquiva aviso", async () => {
   perfil = "OPERADOR";
   assert.equal((await request("POST", "", { titulo: "Novo aviso", mensagem: "Mensagem" })).status, 201);
   assert.equal(aviso.publicadoPorId, id);
-  assert.equal((await request("PATCH", `/${id}/status`, { ativo: false })).status, 200);
+  assert.equal((await request("PATCH", `/${id}/status`, { ativo: false, motivo: "Arquivamento" })).status, 200);
   assert.equal(aviso.ativo, false);
 });
 test("parâmetros inválidos retornam 400 e aviso ausente retorna 404", async () => {

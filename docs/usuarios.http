@@ -49,14 +49,14 @@ PATCH {{base}}/usuarios/{{usuarioId}}/status
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "status": "ATIVA" }
+{ "status": "ATIVA", "motivo": "Ativação administrativa" }
 
 ### Desativação lógica
 PATCH {{base}}/usuarios/{{usuarioId}}/status
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "status": "INATIVA" }
+{ "status": "INATIVA", "motivo": "Desativação administrativa" }
 
 ### Recuperação: confira o Mailtrap
 POST {{base}}/auth/recuperar-senha

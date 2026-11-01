@@ -43,7 +43,7 @@ async function comTransacao<T>(operacao: (tx: Prisma.TransactionClient) => Promi
   }
 }
 
-async function validarUnidade(tx: Prisma.TransactionClient, unidadeEnsinoId: string) {
+export async function validarUnidade(tx: Prisma.TransactionClient, unidadeEnsinoId: string) {
   const unidade = await tx.unidadeEnsino.findUnique({
     where: { id: unidadeEnsinoId },
     select: { ativa: true, instituicaoEnsino: { select: { ativa: true } }, pontoParada: { select: { ativo: true } } },
@@ -115,11 +115,11 @@ export async function listarEstudantes({ pagina, limite, statusCadastro, unidade
   };
 }
 
-export async function editarEstudante(id: string, dados: DadosEdicao) {
+export async function editarEstudante(id: string, dados: DadosEdicao, operadorId: string) {
   return comTransacao(async (tx) => {
     const atual = await tx.estudante.findUnique({
       where: { id },
-      select: { id: true, statusCadastro: true, matricula: true, unidadeEnsinoId: true },
+      select: { id: true, usuarioId: true, statusCadastro: true, matricula: true, unidadeEnsinoId: true, previsaoConclusao: true },
     });
     if (!atual) throw new HttpError(404, "Cadastro acadêmico não encontrado");
     if (atual.statusCadastro === "APROVADO") {
@@ -145,6 +145,9 @@ export async function editarEstudante(id: string, dados: DadosEdicao) {
       },
       select: estudanteDetalheSelect,
     });
+    await tx.alteracaoPerfil.create({ data: { usuarioId: atual.usuarioId, realizadaPorId: operadorId, motivo: dados.motivo,
+      dadosAnteriores: { estudanteId: id, matricula: atual.matricula, unidadeEnsinoId: atual.unidadeEnsinoId, previsaoConclusao: atual.previsaoConclusao.toISOString() },
+      dadosNovos: { estudanteId: id, matricula: estudante.matricula, unidadeEnsinoId: estudante.unidadeEnsino.id, previsaoConclusao: estudante.previsaoConclusao.toISOString() } } });
     return estudanteDetalheDto(estudante);
   });
 }
@@ -153,7 +156,7 @@ async function alterarStatus(
   id: string,
   operadorId: string,
   statusCadastro: "APROVADO" | "REJEITADO" | "SUSPENSO",
-  observacao?: string,
+  observacao: string,
   reativacao = false,
 ) {
   return comTransacao(async (tx) => {
@@ -195,11 +198,13 @@ async function alterarStatus(
     }
     const atualizado = await tx.estudante.findUnique({ where: { id }, select: estudanteDetalheSelect });
     if (!atualizado) throw new HttpError(404, "Cadastro acadêmico não encontrado");
+    await tx.alteracaoPerfil.create({ data: { usuarioId: estudante.usuarioId, realizadaPorId: operadorId, motivo: observacao!,
+      dadosAnteriores: { estudanteId: id, statusCadastro: estudante.statusCadastro }, dadosNovos: { estudanteId: id, statusCadastro } } });
     return estudanteDetalheDto(atualizado);
   });
 }
 
-export function aprovarEstudante(id: string, operadorId: string, observacao?: string) {
+export function aprovarEstudante(id: string, operadorId: string, observacao: string) {
   return alterarStatus(id, operadorId, "APROVADO", observacao);
 }
 
@@ -211,8 +216,8 @@ export function suspenderEstudante(id: string, operadorId: string, motivo: strin
   return alterarStatus(id, operadorId, "SUSPENSO", motivo);
 }
 
-export function reativarEstudante(id: string, operadorId: string) {
-  return alterarStatus(id, operadorId, "APROVADO", undefined, true);
+export function reativarEstudante(id: string, operadorId: string, motivo: string) {
+  return alterarStatus(id, operadorId, "APROVADO", motivo, true);
 }
 
 export async function listarComprovantes(usuarioId: string, { pagina, limite }: z.infer<typeof listarComprovantesSchema>) {
