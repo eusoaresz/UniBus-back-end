@@ -11,6 +11,7 @@ export const viagemSelect = {
       motoristaId: true, veiculoId: true, motoristaExtraId: true, veiculoExtraId: true,
       capacidade: true, capacidadeExtra: true, inscricoesSuspensas: true,
       paradas: {
+        where: { ativa: true },
         orderBy: { ordem: "asc" },
         select: { id: true, pontoParadaId: true, ordem: true, nome: true, cidade: true, endereco: true, referencia: true },
       },

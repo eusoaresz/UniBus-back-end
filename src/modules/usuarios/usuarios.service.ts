@@ -2,16 +2,17 @@ import bcrypt from "bcrypt";
 import type { z } from "zod";
 import { prisma } from "../../../lib/prisma";
 import { HttpError } from "../../shared/errors/http-error";
-import { criarUsuarioSchema, atualizarMeSchema, listarUsuariosSchema, statusSchema } from "./usuarios.schemas";
-import { usuarioSelect, usuarioListaSelect } from "./usuarios.dto";
+import { atualizarMeSchema, criarUsuarioSchema, listarUsuariosSchema, statusSchema } from "./usuarios.schemas";
+import { usuarioSelect, usuarioListaSelect, usuarioDto } from "./usuarios.dto";
 
 export async function criarUsuario(dados: z.infer<typeof criarUsuarioSchema>, operadorId: string) {
   if (dados.perfil === "ESTUDANTE") throw new HttpError(409, "Cadastre o estudante em /api/v1/estudantes com os dados acadêmicos para criar sua carteira");
-  const { senha, ...usuario } = dados;
-  return prisma.usuario.create({
-    data: { ...usuario, senhaHash: await bcrypt.hash(senha, 10), cadastradoPorId: operadorId },
+  const { senha, dataNascimento, ...usuario } = dados;
+  return usuarioDto(await prisma.usuario.create({
+    data: { ...usuario, dataNascimento: dataNascimento ? new Date(`${dataNascimento}T00:00:00Z`) : null,
+      senhaHash: await bcrypt.hash(senha, 10), cadastradoPorId: operadorId },
     select: usuarioSelect,
-  });
+  }));
 }
 
 export async function listarUsuarios({ pagina, limite, perfil, status }: z.infer<typeof listarUsuariosSchema>) {
@@ -25,14 +26,14 @@ export async function listarUsuarios({ pagina, limite, perfil, status }: z.infer
 export async function consultarUsuario(id: string) {
   const usuario = await prisma.usuario.findUnique({ where: { id }, select: usuarioSelect });
   if (!usuario) throw new HttpError(404, "Usuário não encontrado");
-  return usuario;
-}
-
-export function atualizarMe(id: string, dados: z.infer<typeof atualizarMeSchema>) {
-  return prisma.usuario.update({ where: { id }, data: dados, select: usuarioSelect });
+  return usuarioDto(usuario);
 }
 
 export function alterarStatus(id: string, operadorId: string, dados: z.infer<typeof statusSchema>) {
   if (id === operadorId) throw new HttpError(409, "Não é permitido alterar o próprio status nesta rota");
-  return prisma.usuario.update({ where: { id }, data: { status: dados.status }, select: usuarioSelect });
+  return prisma.usuario.update({ where: { id }, data: { status: dados.status }, select: usuarioSelect }).then(usuarioDto);
+}
+
+export async function atualizarMe(id: string, dados: z.infer<typeof atualizarMeSchema>) {
+  return usuarioDto(await prisma.usuario.update({ where: { id }, data: dados, select: usuarioSelect }));
 }

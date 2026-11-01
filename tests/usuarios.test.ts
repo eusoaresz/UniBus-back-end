@@ -240,7 +240,7 @@ test("estudante não consulta outro usuário", async () => {
   assert.equal(res.status, 403);
 });
 
-test("alteração de perfil próprio permite apenas nome e telefone", async () => {
+test("estudante altera somente nome e telefone próprios", async () => {
   usuario!.perfil = "ESTUDANTE";
   const res = await requisicao("PATCH", "/api/v1/usuarios/me", token(), { nome: "Nome atualizado" });
   assert.equal(res.status, 200);

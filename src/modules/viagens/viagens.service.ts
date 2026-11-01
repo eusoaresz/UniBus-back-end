@@ -28,7 +28,7 @@ function normalizar(texto: string) {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
 
-async function consultarRota(tx: Prisma.TransactionClient, id: string) {
+export async function consultarRota(tx: Prisma.TransactionClient, id: string) {
   const rota = await tx.rota.findUnique({
     where: { id },
     select: { nome: true, ativa: true, paradas: {

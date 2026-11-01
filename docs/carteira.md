@@ -50,7 +50,7 @@ As notificações são gravadas junto à transação financeira e consultadas no
 
 ## Serviço financeiro interno
 
-`debitar(tx, dados)` e `estornar(tx, dados)` recebem a mesma transação Prisma utilizada pela operação de viagem. Não existe rota HTTP de débito livre. Débito exige participação confirmada, ciclo correspondente, valor igual à tarifa do trecho e carteira do estudante da participação. A cobrança deve ocorrer no mesmo commit da confirmação da vaga. A integração com viagens ainda precisa ser implementada.
+`debitar(tx, dados)` e `estornar(tx, dados)` recebem a mesma transação Prisma utilizada pela operação de viagem. Não existe rota HTTP de débito livre. Débito exige participação confirmada, ciclo correspondente, valor igual à tarifa do trecho e carteira do estudante da participação. A cobrança deve ocorrer no mesmo commit da confirmação da vaga. O módulo de operação utiliza esses serviços na confirmação e no cancelamento dentro da mesma transação; consulte operacao.md.
 
 `executarTransacao` utiliza Serializable, com até três tentativas para conflito de concorrência. A carteira também é atualizada comparando sua versão; uma leitura antiga não pode sobrescrever saldo novo. O extrato é somente inclusão, protegido por trigger contra UPDATE e DELETE. Idempotência e estorno único são protegidos por restrições no banco.
 
@@ -66,4 +66,4 @@ Não executada no Neon. Antes de aplicar no compartilhado, revisar com o colega 
 
 Os testes da carteira usam a API HTTP, Prisma e PostgreSQL em memória via PGlite, com adaptador exclusivo de testes. Cobrem crédito, débito, estorno, rollback, permissões, repetição, matrícula e chamadas simultâneas. PGlite serializa transações em uma conexão: esses testes verificam resultados e comparação de versão, mas não reproduzem todos os conflitos entre múltiplas conexões no PostgreSQL de produção. Validar também com PostgreSQL dedicado antes de disponibilizar operações financeiras reais.
 
-Ainda pendentes: interface do aplicativo, confirmação de viagem integrada, fila, alocação/publicação, disciplina automática, push e pagamentos integrados. O ZIP contém o backend; não é uma interface gráfica pronta.
+Ainda pendentes: interface do aplicativo, validação financeira em PostgreSQL com múltiplas conexões, push e pagamentos integrados. Operação já implementa confirmação/fila, alocação/publicação e disciplina, com os limites documentados em operacao.md. O ZIP contém o backend; não é uma interface gráfica pronta.

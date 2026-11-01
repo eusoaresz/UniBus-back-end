@@ -24,8 +24,12 @@ Veja [contratos, testes e limitações](usuarios.md) e [requisições manuais](u
 
 ## Próximos domínios
 
-Cadastro de motoristas, instituições, pontos, rotas, veículos, escalas, publicação e execução de viagens, participações, embarques, integração da carteira com viagens e comunicação externa. Tabelas não significam fluxos implementados. Veja [o escopo atual de viagens](viagens.md) e [da carteira](carteira.md).
+Cadastro de motoristas, instituições, pontos, rotas, veículos, escalas e comunicação externa. Tabelas não significam fluxos implementados. Veja [o escopo atual de viagens](viagens.md) e [da carteira](carteira.md).
 
 ## Antes de produção
 
 Provisionamento seguro do primeiro operador, verificação de e-mail, sessões revogáveis, auditoria administrativa persistente, limitador compartilhado, SMTP real e testes com PostgreSQL para concorrência/rollback. Configurar TLS, acesso restrito ao banco/arquivos/backups e monitoramento sem dados pessoais.
+
+## Operação integrada
+
+O módulo de operação implementa publicação, recursos, fila, confirmação com cobrança, embarque, execução, disciplina e troca conjunta de rota com resolução dos passageiros. Preferências próprias, correções administrativas de perfil e fotos privadas também estão implementadas.
