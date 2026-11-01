@@ -126,7 +126,7 @@ export function editarRascunho(id: string, dados: z.infer<typeof editarViagemRas
       });
     }
     return viagemDto(await tx.viagem.update({
-      where: { id }, data: { data: new Date(dados.data), turno: dados.turno, rotaId: dados.rotaId, nomeRota: rota.nome },
+      where: { id }, data: { data: new Date(dados.data), turno: dados.turno, rotaId: dados.rotaId, nomeRota: rota.nome, revisaoRotaPendente: false },
       select: viagemSelect,
     }));
   });

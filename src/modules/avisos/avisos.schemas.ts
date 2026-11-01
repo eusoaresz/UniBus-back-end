@@ -16,16 +16,18 @@ const camposAviso = {
 export const criarAvisoSchema = z.strictObject(camposAviso);
 
 export const editarAvisoSchema = z.strictObject({
+  motivo: z.string().trim().min(3).max(1000),
   titulo: camposAviso.titulo.optional(),
   mensagem: camposAviso.mensagem.optional(),
   categoria: z.enum(["GERAL", "VIAGENS"]).optional(),
   importante: z.boolean().optional(),
   publicoPerfil: publicoPerfil.optional(),
   expiraEm: expiraEm.optional(),
-}).refine((dados) => Object.keys(dados).length > 0, "Informe ao menos um campo para alteração");
+}).refine((dados) => Object.keys(dados).some(campo => campo !== "motivo"), "Informe ao menos um campo para alteração");
 
 export const alterarStatusAvisoSchema = z.strictObject({
   ativo: z.boolean(),
+  motivo: z.string().trim().min(3).max(1000),
 });
 
 export const avisoIdSchema = z.string().uuid();

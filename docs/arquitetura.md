@@ -24,12 +24,20 @@ Veja [contratos, testes e limitações](usuarios.md) e [requisições manuais](u
 
 ## Próximos domínios
 
-Cadastro de motoristas, instituições, pontos, rotas, veículos, escalas e comunicação externa. Tabelas não significam fluxos implementados. Veja [o escopo atual de viagens](viagens.md) e [da carteira](carteira.md).
+Escalas recorrentes e comunicação externa. Os fluxos de status de contas, edição acadêmica e avisos possuem auditoria; encerramento e reabertura de estudantes estão implementados conforme seus contratos. Tabelas não significam fluxos implementados. Veja [o escopo atual de viagens](viagens.md) e [da carteira](carteira.md).
 
 ## Antes de produção
 
-Provisionamento seguro do primeiro operador, verificação de e-mail, sessões revogáveis, auditoria administrativa persistente, limitador compartilhado, SMTP real e testes com PostgreSQL para concorrência/rollback. Configurar TLS, acesso restrito ao banco/arquivos/backups e monitoramento sem dados pessoais.
+Provisionamento seguro do primeiro operador, verificação de e-mail, sessões revogáveis, política de consulta e retenção das auditorias administrativas, limitador compartilhado, SMTP real e testes com PostgreSQL para concorrência/rollback. Configurar TLS, acesso restrito ao banco/arquivos/backups e monitoramento sem dados pessoais.
 
 ## Operação integrada
 
 O módulo de operação implementa publicação, recursos, fila, confirmação com cobrança, embarque, execução, disciplina e troca conjunta de rota com resolução dos passageiros. Preferências próprias, correções administrativas de perfil e fotos privadas também estão implementadas.
+
+O módulo de motoristas implementa cadastro unificado ativo, complemento de contas existentes, consulta, edição da CNH e auditoria. Desativação exige resolução de vínculos operacionais e motivo.
+
+O módulo de veículos implementa cadastro, consulta, edição, ativação/desativação e histórico administrativo, com proteção de vínculos operacionais e revisão da alocação após redução de capacidade.
+
+O módulo de ensino administra instituições, unidades e pontos de parada, com histórico e bloqueios de desativação por vínculos. Alterações cadastrais preservam as paradas já salvas nas viagens.
+
+O módulo de catálogos administra rotas e cidades com histórico. Mudanças de itinerário preservam viagens publicadas e exigem revisão dos rascunhos vinculados.

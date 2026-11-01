@@ -4,7 +4,7 @@ Implementa saldo, extrato, Pix solicitado pelo estudante, aprovação/rejeição
 
 ## Acesso
 
-Rotas exigem JWT e conta ativa. O estudante aprovado ou suspenso pode consultar sua própria carteira e solicitar Pix. Pendente ou rejeitado não acessa. Conta bloqueada não acessa. Operadores consultam todas as carteiras e analisam recargas. Operador não exerce o papel de estudante. Motorista não acessa essas rotas.
+Rotas exigem JWT e conta ativa. O estudante aprovado ou suspenso pode consultar sua própria carteira e solicitar Pix. Estudante ENCERRADO pode consultar carteira e histórico, mas não solicitar Pix. Pendente ou rejeitado não acessa. Conta bloqueada não acessa. Operadores consultam todas as carteiras e analisam recargas. Operador não exerce o papel de estudante. Motorista não acessa essas rotas.
 
 O módulo de estudantes registra Usuário, Estudante aprovado presencialmente e Carteira na mesma transação. A conta de acesso nasce AGUARDANDO_ATIVACAO, conforme o fluxo de usuários existente; o operador ativa em PATCH /api/v1/usuarios/:id/status. Isso não é uma segunda aprovação da matrícula. Não há cadastro público de operador.
 

@@ -27,7 +27,7 @@ Os caminhos antigos `/usuarios` e `/usuarios/login`, `/usuarios/recuperar-senha`
 
 Filtros: `?pagina=1&limite=20&perfil=ESTUDANTE&status=ATIVA`. Limite máximo 100; filtros desconhecidos são rejeitados. `meta` contém `pagina`, `limite` e `temProxima`.
 
-Cadastro recebe nome, cpf, email, telefone, senha e perfil (MOTORISTA ou OPERADOR). Estudantes usam `/api/v1/estudantes`, com dados acadêmicos, aprovação presencial e criação da carteira na mesma transação; tentar cadastrar ESTUDANTE pela rota genérica retorna 409. CPF aceita máscara e valida dígitos; telefone brasileiro exige DDD; e-mail é normalizado. Senha exige oito caracteres, maiúscula, minúscula, número e símbolo, com teto de 72 bytes (bcrypt). Campos extras são rejeitados. Conta criada fica AGUARDANDO_ATIVACAO.
+Cadastro recebe nome, cpf, email, telefone, senha e perfil OPERADOR. Estudantes usam `/api/v1/estudantes`, com dados acadêmicos, aprovação presencial e criação da carteira na mesma transação; tentar cadastrar ESTUDANTE pela rota genérica retorna 409. CPF aceita máscara e valida dígitos; telefone brasileiro exige DDD; e-mail é normalizado. Senha exige oito caracteres, maiúscula, minúscula, número e símbolo, com teto de 72 bytes (bcrypt). Campos extras são rejeitados. Conta de operador criada fica AGUARDANDO_ATIVACAO. Motoristas usam `/api/v1/motoristas` com CNH e conta já ativa; contas MOTORISTA existentes podem ser complementadas sem alterar seu status. Consulte motoristas.md.
 
 Status aceitos: ATIVA, BLOQUEADA e INATIVA. Ativação administrativa não significa verificação do e-mail ou aprovação da matrícula. Operador não pode alterar seu próprio status. Exclusão é lógica: não existe DELETE físico. CPF, perfil e e-mail não são editados neste módulo; precisam de fluxos específicos de correção/verificação.
 
@@ -65,5 +65,7 @@ Testes HTTP usam uma porta temporária em 127.0.0.1. Prisma e SMTP são simulado
 - JWT expira em uma hora. Trocar a senha ainda não revoga JWTs existentes; implementar sessões revogáveis antes de produção. Bloqueio de conta já afeta requisições seguintes.
 - Limitador em memória por IP e e-mail: login 30, recuperação 5 e redefinição 10 por 15 minutos. Reinicia com o processo; múltiplas instâncias exigem armazenamento compartilhado. Configurar proxy confiável explicitamente; não habilitar trust proxy indiscriminadamente.
 - SMTP continua no sandbox Mailtrap. Falha de entrega invalida o código novo e mantém resposta genérica.
-- Falta auditoria persistente de alterações administrativas de status.
+- Alterações administrativas de status de todos os perfis são auditadas e exigem motivo.
 - Não houve migração ou alteração do banco neste ajuste.
+
+Estudantes com cadastro ENCERRADO mantêm somente consultas autenticadas, respeitando o status da conta e impedimentos disciplinares. Consulte encerramento-estudantes.md. A rota de status recebe status e motivo obrigatório para qualquer perfil.

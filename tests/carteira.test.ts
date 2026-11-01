@@ -251,7 +251,7 @@ test("perfil acadêmico é próprio e suspensão e reativação preservam saldo 
   await prisma.carteira.update({ where: { id: aluno.carteira!.id }, data: { saldo: "7.50" } });
   assert.equal((await api("POST", `/estudantes/${aluno.id}/suspender`, operador, { motivo: "Revisão presencial" })).status, 200);
   assert.equal((await api("GET", "/carteira")).body.saldo, "7.50");
-  const reativado = await api("POST", `/estudantes/${aluno.id}/reativar`, operador, {});
+  const reativado = await api("POST", `/estudantes/${aluno.id}/reativar`, operador, { motivo: "Regularização" });
   assert.equal(reativado.status, 200);
   assert.equal(reativado.body.carteira.id, aluno.carteira!.id);
   assert.equal(reativado.body.carteira.saldo, "7.50");
@@ -262,20 +262,20 @@ test("edição considera matrícula e unidade juntas inclusive quando somente a 
   const unidadeNova = await prisma.unidadeEnsino.create({ data: { nome: "Campus edição", pontoParada: { create: { nome: "Ponto edição", cidade: "Pelotas" } }, instituicaoEnsino: { create: { nome: "Instituição edição", tipo: "FACULDADE" } } } });
   const original = await prisma.estudante.findUniqueOrThrow({ where: { id: aluno.id } });
   await prisma.estudante.update({ where: { id: outro.id }, data: { statusCadastro: "PENDENTE", unidadeEnsinoId: unidadeNova.id } });
-  assert.equal((await api("PATCH", `/estudantes/${outro.id}`, operador, { matricula: original.matricula })).status, 200);
-  assert.equal((await api("PATCH", `/estudantes/${outro.id}`, operador, { unidadeEnsinoId: unidade })).status, 409);
+  assert.equal((await api("PATCH", `/estudantes/${outro.id}`, operador, { matricula: original.matricula, motivo: "Correção" })).status, 200);
+  assert.equal((await api("PATCH", `/estudantes/${outro.id}`, operador, { unidadeEnsinoId: unidade, motivo: "Correção" })).status, 409);
   assert.equal((await prisma.estudante.findUniqueOrThrow({ where: { id: outro.id } })).unidadeEnsinoId, unidadeNova.id);
 });
 
 test("aprovação de cadastro legado cria carteira ausente e registra o operador", async () => {
   await prisma.carteira.delete({ where: { id: aluno.carteira!.id } });
   await prisma.estudante.update({ where: { id: aluno.id }, data: { statusCadastro: "PENDENTE" } });
-  const aprovado = await api("POST", `/estudantes/${aluno.id}/aprovar`, operador, {});
+  const aprovado = await api("POST", `/estudantes/${aluno.id}/aprovar`, operador, { motivo: "Aprovação presencial" });
   assert.equal(aprovado.status, 200);
   assert.equal(aprovado.body.carteira.saldo, "0.00");
   assert.equal(aprovado.body.analisadoPor.id, operador);
   assert.equal((await api("GET", "/carteira")).status, 200);
-  assert.equal((await api("POST", `/estudantes/${aluno.id}/aprovar`, operador, {})).status, 409);
+  assert.equal((await api("POST", `/estudantes/${aluno.id}/aprovar`, operador, { motivo: "Aprovação presencial" })).status, 409);
   assert.equal(await prisma.carteira.count({ where: { estudanteId: aluno.id } }), 1);
 });
 
