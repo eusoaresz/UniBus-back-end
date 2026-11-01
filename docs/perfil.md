@@ -2,7 +2,7 @@
 
 Base: `/api/v1`. Todas as rotas exigem `Authorization: Bearer {{token}}`.
 
-O estudante consulta os próprios dados. Somente um operador ativo pode alterar dados pessoais, acadêmicos e foto. Preferências de viagens continuam sendo editadas pelo próprio usuário nas rotas de preferências.
+O estudante consulta seus dados e pode editar somente nome e telefone em PATCH /usuarios/me, com corpo estrito e sem motivo obrigatório. E-mail, nascimento, dados acadêmicos e foto continuam sob correção exclusiva de operador ativo, com motivo e auditoria. Preferências de viagens continuam sendo editadas pelo próprio usuário nas rotas de preferências.
 
 ## Consulta
 
@@ -33,7 +33,7 @@ Não são retornados CPF, hash de senha nem chave do arquivo. Dados novos são o
 
 Nascimento, curso e cidade podem ser removidos enviando `null`. Unidade de ensino não pode ser removida. A unidade, sua instituição e seu ponto de parada precisam estar ativos; a cidade também precisa estar ativa ao ser selecionada. Universidade é obtida pela unidade de ensino, evitando dois vínculos contraditórios. A cidade de origem não é a lista de cidades favoritas.
 
-Permite corrigir os campos acima em estudantes aprovados. Não muda matrícula, aprovação, perfil, CPF, senha ou saldo. Os campos não previstos são rejeitados. `PATCH /usuarios/me` segue o mesmo contrato, exclusivamente para o operador corrigir seus próprios dados.
+Permite corrigir os campos acima em estudantes aprovados. Não muda matrícula, aprovação, perfil, CPF, senha ou saldo. Os campos não previstos são rejeitados. `PATCH /usuarios/me` aceita apenas nome e telefone do próprio usuário. Para corrigir os demais dados próprios, o operador utiliza `/usuarios/:id/dados`, informando seu ID e o motivo.
 
 Uma mudança real de e-mail remove a marca de e-mail verificado e invalida tokens de ativação/recuperação ainda não utilizados. Não altera a senha nem revoga JWTs já emitidos.
 
@@ -58,4 +58,4 @@ Antes de usar os campos, aplique a migração `20261031000300_meus_dados` no ban
 
 ## Respostas a testar
 
-Consulta/correção válida: 200. Sem autenticação: 401. Tentativa de edição por estudante/motorista ou leitura de foto alheia: 403. Campos inválidos, motivo ausente ou nascimento futuro: 400. Usuário/foto inexistente: 404. E-mail ou matrícula em conflito: 409, com rollback completo. Foto grande: 413. Formato de foto não suportado: 415.
+Consulta/correção válida: 200. Sem autenticação: 401. Tentativa de correção administrativa por estudante/motorista ou leitura de foto alheia: 403. Autoedição com campos além de nome/telefone: 400. Campos inválidos, motivo ausente ou nascimento futuro: 400. Usuário/foto inexistente: 404. E-mail ou matrícula em conflito: 409, com rollback completo. Foto grande: 413. Formato de foto não suportado: 415.

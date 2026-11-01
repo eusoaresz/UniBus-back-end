@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import type { z } from "zod";
 import { prisma } from "../../../lib/prisma";
 import { HttpError } from "../../shared/errors/http-error";
-import { criarUsuarioSchema, listarUsuariosSchema, statusSchema } from "./usuarios.schemas";
+import { atualizarMeSchema, criarUsuarioSchema, listarUsuariosSchema, statusSchema } from "./usuarios.schemas";
 import { usuarioSelect, usuarioListaSelect, usuarioDto } from "./usuarios.dto";
 
 export async function criarUsuario(dados: z.infer<typeof criarUsuarioSchema>, operadorId: string) {
@@ -32,4 +32,8 @@ export async function consultarUsuario(id: string) {
 export function alterarStatus(id: string, operadorId: string, dados: z.infer<typeof statusSchema>) {
   if (id === operadorId) throw new HttpError(409, "Não é permitido alterar o próprio status nesta rota");
   return prisma.usuario.update({ where: { id }, data: { status: dados.status }, select: usuarioSelect }).then(usuarioDto);
+}
+
+export async function atualizarMe(id: string, dados: z.infer<typeof atualizarMeSchema>) {
+  return usuarioDto(await prisma.usuario.update({ where: { id }, data: dados, select: usuarioSelect }));
 }

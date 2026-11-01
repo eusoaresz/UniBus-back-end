@@ -4,6 +4,7 @@ import { verificarToken, exigirOperador, type ReqUsuario } from "../../shared/mi
 import { serializar } from "../carteira/carteira.service";
 import { HttpError } from "../../shared/errors/http-error";
 import * as s from "./operacao.schemas";
+import { alterarRotaPublicada } from "./rota.service";
 import * as recursos from "./recursos.service";
 import * as participacoes from "./participacoes.service";
 import * as execucao from "./execucao.service";
@@ -34,7 +35,7 @@ router.get("/trechos", responder(async (req) => {
     select: { id: true, viagemId: true, sentido: true, status: true, saidaPrevistaEm: true, chegadaPrevistaEm: true,
       limiteConfirmacaoEm: true, limiteCancelamentoEm: true, tarifa: true, capacidade: true, capacidadeExtra: true,
       viagem: { select: { nomeRota: true, turno: true } },
-      paradas: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, cidade: true, ordem: true } },
+      paradas: { where: { ativa: true }, orderBy: { ordem: "asc" }, select: { id: true, nome: true, cidade: true, ordem: true } },
       _count: { select: { participacoes: { where: { status: "CONFIRMADA" } } } } },
   });
 }));
@@ -56,7 +57,7 @@ router.get("/trechos/:id", responder(async (req) => {
       motoristaExtra: { select: { usuario: { select: { nome: true } } } },
       veiculo: { select: { identificacao: true, placa: true, tipo: true } },
       veiculoExtra: { select: { identificacao: true, placa: true, tipo: true } },
-      paradas: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, cidade: true, endereco: true, referencia: true, ordem: true } },
+      paradas: { where: { ativa: true }, orderBy: { ordem: "asc" }, select: { id: true, nome: true, cidade: true, endereco: true, referencia: true, ordem: true } },
       _count: { select: { participacoes: { where: { status: "CONFIRMADA" } } } } } });
   exigir(trecho, "Trecho não encontrado", 404);
   return { ...trecho, minhaParticipacao: req.usuarioPerfil === "ESTUDANTE"
@@ -99,6 +100,7 @@ router.patch("/trechos/:id/recursos", responder((req) => transacao(async (tx) =>
   const atual = await recursos.alocarTx(tx, id(req), s.alocacaoSchema.parse(req.body), req.usuarioId!);
   await participacoes.promoverTx(tx, atual.id, new Date()); return atual;
 })));
+router.patch("/viagens/:id/rota", responder((req) => alterarRotaPublicada(id(req), req.usuarioId!, s.alterarRotaSchema.parse(req.body))));
 router.patch("/trechos/:id/horario", responder((req) => execucao.alterarHorario(id(req), s.reabrirSchema.parse(req.body), req.usuarioId!)));
 router.get("/trechos/:id/fila", responder(async (req) => {
   const p = s.paginaSchema.parse(req.query);
@@ -106,6 +108,7 @@ router.get("/trechos/:id/fila", responder(async (req) => {
     orderBy: { ordemFila: "asc" }, skip: (p.pagina - 1) * p.limite, take: p.limite,
     select: { ...participacaoSelect, estudante: { select: { matricula: true, usuario: { select: { nome: true } } } } } });
 }));
+router.post("/trechos/:id/inclusoes-excepcionais", responder((req) => participacoes.incluirOperador(id(req), req.usuarioId!, s.incluirOperadorSchema.parse(req.body))));
 router.post("/trechos/:id/confirmacoes", responder((req) => {
   const d = s.confirmarOperadorSchema.parse(req.body); return participacoes.confirmarOperador(id(req), d.estudanteId, req.usuarioId!, d.motivo);
 }));

@@ -240,11 +240,12 @@ test("estudante não consulta outro usuário", async () => {
   assert.equal(res.status, 403);
 });
 
-test("estudante não pode alterar dados próprios", async () => {
+test("estudante altera somente nome e telefone próprios", async () => {
   usuario!.perfil = "ESTUDANTE";
   const res = await requisicao("PATCH", "/api/v1/usuarios/me", token(), { nome: "Nome atualizado" });
-  assert.equal(res.status, 403);
-  assert.equal(ultimaAtualizacao, undefined);
+  assert.equal(res.status, 200);
+  assert.equal(ultimaAtualizacao.where.id, id);
+  assert.deepEqual(ultimaAtualizacao.data, { nome: "Nome atualizado" });
 });
 
 for (const body of [{ perfil: "OPERADOR" }, { status: "ATIVA" }, { cpf: cadastro.cpf }, { email: "outro@example.com" }, {}]) {

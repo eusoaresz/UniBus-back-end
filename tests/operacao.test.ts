@@ -338,3 +338,154 @@ test("API impede aluno publicar e motorista consultar passageiros de outro atend
   assert.equal((await request("GET", "/trechos", a.usuarioId)).status, 200);
   assert.equal((await request("GET", `/participacoes/00000000-0000-4000-8000-000000000001/qr`, a.usuarioId)).status, 404);
 });
+
+test("REVISAO: publicacao rejeita capacidade extra desatualizada", async () => {
+  const v=await viagem(180,1), t=v.trechos[0];
+  const m=await motorista(), extra=await veiculo(10,"VAN");
+  await recursos.alocar(t.id,{motoristaId:v.motorista.id,veiculoId:v.veiculo.id,motoristaExtraId:m.id,veiculoExtraId:extra.id,motivo:"Revisao de capacidade"},operadorId);
+  await prisma.veiculo.update({where:{id:extra.id},data:{capacidade:2}});
+  await assert.rejects(recursos.publicar(v.id,operadorId), /capacidade|Capacidade/);
+});
+
+test("REVISAO: antecipar saida reduz limite do estorno tardio", async (ctx) => {
+  const v=await publicar(180,1), t=v.trechos[0], a=await aluno("-20.00");
+  const p=await inscricoes.inscrever(t.id,a.usuarioId,entrada(t));
+  assert.equal(p.status,"EM_ESPERA");
+  ctx.mock.timers.setTime(t.saidaPrevistaEm.getTime()-40*60000);
+  await prisma.carteira.update({where:{estudanteId:a.id},data:{saldo:"100.00"}});
+  await inscricoes.confirmarOperador(t.id,a.id,operadorId,"Confirmacao tardia para revisao");
+  const novaSaida=new Date(Date.now()+10*60000);
+  await execucao.alterarHorario(t.id,{saidaPrevistaEm:novaSaida.toISOString(),chegadaPrevistaEm:new Date(novaSaida.getTime()+3600000).toISOString(),reabrir:false,motivo:"Antecipacao para revisao"},operadorId);
+  const atual=await prisma.participacaoTrecho.findUniqueOrThrow({where:{id:p.id}});
+  assert.ok(atual.limiteEstornoEm && atual.limiteEstornoEm <= novaSaida,"Janela tardia ficou depois da nova saida");
+});
+
+test("REVISAO: cancelar depois da saida antecipada nao estorna", async (ctx) => {
+  const v=await publicar(180,1), t=v.trechos[0], a=await aluno("-20.00");
+  const p=await inscricoes.inscrever(t.id,a.usuarioId,entrada(t));
+  ctx.mock.timers.setTime(t.saidaPrevistaEm.getTime()-40*60000);
+  await prisma.carteira.update({where:{estudanteId:a.id},data:{saldo:"100.00"}});
+  await inscricoes.confirmarOperador(t.id,a.id,operadorId,"Confirmacao tardia para revisao");
+  const novaSaida=new Date(Date.now()+10*60000);
+  await execucao.alterarHorario(t.id,{saidaPrevistaEm:novaSaida.toISOString(),chegadaPrevistaEm:new Date(novaSaida.getTime()+3600000).toISOString(),reabrir:false,motivo:"Antecipacao para revisao"},operadorId);
+  ctx.mock.timers.setTime(novaSaida.getTime()+60000);
+  await assert.rejects(inscricoes.cancelarPropria(p.id,a.usuarioId));
+});
+
+test("inclusao excepcional respeita fila, permanece esperando e nao duplica cobranca", async(ctx)=>{
+  const v=await publicar(),t=v.trechos[0],anterior=await aluno("-20.00"),novo=await aluno();
+  const primeiro=await inscricoes.inscrever(t.id,anterior.usuarioId,entrada(t));
+  ctx.mock.timers.setTime(t.saidaPrevistaEm.getTime()-40*60000);
+  await prisma.carteira.update({where:{estudanteId:anterior.id},data:{saldo:"100.00"}});
+  const dados={estudanteId:novo.id,...entrada(t),motivo:"Inclusao presencial excepcional"};
+  const response=await request("POST",'/trechos/'+t.id+'/inclusoes-excepcionais',operadorId,dados);
+  assert.equal(response.status,200);const inserido=await response.json() as any;
+  assert.equal(inserido.status,"EM_ESPERA");
+  assert.equal((await prisma.participacaoTrecho.findUniqueOrThrow({where:{id:primeiro.id}})).status,"CONFIRMADA");
+  assert.equal((await prisma.carteira.findUniqueOrThrow({where:{estudanteId:novo.id}})).saldo.toFixed(2),"100.00");
+  const maior=await veiculo(2);
+  await recursos.alocar(t.id,{motoristaId:v.motorista.id,veiculoId:maior.id,motoristaExtraId:null,veiculoExtraId:null,motivo:"Aumento da capacidade"},operadorId);
+  const confirmado=await inscricoes.incluirOperador(t.id,operadorId,dados);
+  assert.equal(confirmado.status,"CONFIRMADA");assert.equal(confirmado.ordemFila.toString(),inserido.ordemFila);
+  await inscricoes.incluirOperador(t.id,operadorId,dados);
+  assert.equal((await prisma.carteira.findUniqueOrThrow({where:{estudanteId:novo.id}})).saldo.toFixed(2),"98.00");
+  const registro=await prisma.alteracaoParticipacao.findFirst({where:{participacaoId:confirmado.id,acao:"ENTRADA_FILA"}});
+  assert.equal(registro?.realizadaPorId,operadorId);assert.equal(registro?.motivo,dados.motivo);
+});
+
+test("inclusao excepcional valida autor, motivo, pontos, saldo e inicio", async(ctx)=>{
+  const v=await publicar(),t=v.trechos[0],a=await aluno("-20.00");
+  ctx.mock.timers.setTime(t.saidaPrevistaEm.getTime()-40*60000);
+  const dados={estudanteId:a.id,...entrada(t),motivo:"Inclusao autorizada"};
+  const path='/trechos/'+t.id+'/inclusoes-excepcionais';
+  assert.equal((await request("POST",path,a.usuarioId,dados)).status,403);
+  assert.equal((await request("POST",path,operadorId,{...dados,motivo:""})).status,400);
+  await assert.rejects(inscricoes.incluirOperador(t.id,operadorId,{...dados,destinoId:dados.origemId}),/Origem/);
+  assert.equal(await prisma.participacaoTrecho.count({where:{estudanteId:a.id}}),0);
+  const p=await inscricoes.incluirOperador(t.id,operadorId,dados);assert.equal(p.status,"EM_ESPERA");
+  assert.equal((await prisma.carteira.findUniqueOrThrow({where:{estudanteId:a.id}})).saldo.toFixed(2),"-20.00");
+  await execucao.iniciar(t.id,operadorId);
+  await assert.rejects(inscricoes.incluirOperador(t.id,operadorId,dados),/indisponível/);
+});
+
+test("inicio exige rever capacidade reduzida e realocar todos antes de prosseguir", async()=>{
+  const v=await publicar(180,2),t=v.trechos[0],a=await aluno(),b=await aluno();
+  await inscricoes.inscrever(t.id,a.usuarioId,entrada(t));await inscricoes.inscrever(t.id,b.usuarioId,entrada(t));
+  await prisma.veiculo.update({where:{id:v.veiculo.id},data:{capacidade:1}});
+  await assert.rejects(execucao.iniciar(t.id,operadorId),/Capacidade/);
+  await assert.rejects(recursos.alocar(t.id,{motoristaId:v.motorista.id,veiculoId:v.veiculo.id,motoristaExtraId:null,veiculoExtraId:null,motivo:"Revisao sem vagas"},operadorId),/insuficiente/);
+  const m=await motorista(),extra=await veiculo(1,"VAN");
+  await recursos.alocar(t.id,{motoristaId:v.motorista.id,veiculoId:v.veiculo.id,motoristaExtraId:m.id,veiculoExtraId:extra.id,motivo:"Realocacao com apoio"},operadorId);
+  await execucao.iniciar(t.id,operadorId);
+  assert.equal(await prisma.participacaoTrecho.count({where:{trechoId:t.id,status:"CONFIRMADA"}}),2);
+});
+
+test("adiar nao amplia estorno tardio e inicio real encerra a janela",async(ctx)=>{
+  const v=await publicar(),t=v.trechos[0],a=await aluno("-20.00");
+  const p=await inscricoes.inscrever(t.id,a.usuarioId,entrada(t));ctx.mock.timers.setTime(t.saidaPrevistaEm.getTime()-40*60000);
+  await prisma.carteira.update({where:{estudanteId:a.id},data:{saldo:"100.00"}});
+  const c=await inscricoes.confirmarOperador(t.id,a.id,operadorId,"Confirmacao excepcional");
+  await execucao.alterarHorario(t.id,{saidaPrevistaEm:new Date(t.saidaPrevistaEm.getTime()+10*60000).toISOString(),chegadaPrevistaEm:new Date(t.chegadaPrevistaEm.getTime()+10*60000).toISOString(),reabrir:false,motivo:"Adiamento"},operadorId);
+  assert.equal((await prisma.participacaoTrecho.findUniqueOrThrow({where:{id:p.id}})).limiteEstornoEm?.getTime(),c.limiteEstornoEm?.getTime());
+  await execucao.iniciar(t.id,operadorId);
+  assert.equal((await prisma.participacaoTrecho.findUniqueOrThrow({where:{id:p.id}})).limiteEstornoEm?.getTime(),Date.now());
+  await assert.rejects(inscricoes.cancelarPropria(p.id,a.usuarioId),/permite/);
+});
+
+async function rotaAlternativa(manterCampus = false) {
+  const ponto = await prisma.pontoParada.create({ data: { nome: "Novo campus", cidade: "Pelotas" } });
+  const ids = [...pontos.slice(0, 2), ...(manterCampus ? [pontos[2]] : []), ponto.id];
+  const rota = await prisma.rota.create({ data: { nome: 'Alternativa '+(++contador), paradas: { create: ids.map((pontoParadaId, i) => ({ pontoParadaId, ordem: i+1 })) } } });
+  return { rota, ponto };
+}
+
+test("troca de rota exige solucao de ambas as pernas e reverte estorno se alguma falhar", async()=>{
+  const v=await publicar(),a=await aluno();
+  const ps=await inscricoes.inscreverDupla(a.usuarioId,{trechos:v.trechos.map(t=>({trechoId:t.id,...entrada(t)}))});
+  const {rota}=await rotaAlternativa();
+  const apiRota=await import("../src/modules/operacao/rota.service");
+  await assert.rejects(apiRota.alterarRotaPublicada(v.id,operadorId,{rotaId:rota.id,motivo:"Mudanca de itinerario",resolucoes:[{participacaoId:ps[0].id,acao:"CANCELAR",motivo:"Sem parada adequada"}]}),/Resolva/);
+  assert.equal((await prisma.viagem.findUniqueOrThrow({where:{id:v.id}})).rotaId,v.rotaId);
+  assert.equal(await prisma.participacaoTrecho.count({where:{estudanteId:a.id,status:"CONFIRMADA"}}),2);
+  assert.equal((await prisma.carteira.findUniqueOrThrow({where:{estudanteId:a.id}})).saldo.toFixed(2),"96.00");
+  assert.equal(await prisma.movimentacaoCarteira.count({where:{carteiraId:a.carteira!.id,tipo:"ESTORNO"}}),0);
+  assert.equal(await prisma.paradaTrecho.count({where:{trechoId:{in:v.trechos.map(t=>t.id)},ativa:false}}),0);
+});
+
+test("troca conjunta cancela com estorno, realoca volta, preserva historico e rejeita paradas antigas", async()=>{
+  const v=await publicar(),a=await aluno();
+  const ps=await inscricoes.inscreverDupla(a.usuarioId,{trechos:v.trechos.map(t=>({trechoId:t.id,...entrada(t)}))});
+  const {rota,ponto}=await rotaAlternativa();
+  const dados={rotaId:rota.id,motivo:"Novo itinerario acordado",resolucoes:[
+    {participacaoId:ps[0].id,acao:"CANCELAR",motivo:"Sem embarque adequado na ida"},
+    {participacaoId:ps[1].id,acao:"REALOCAR",origemPontoId:ponto.id,destinoPontoId:pontos[0]},
+  ]};
+  const url='/viagens/'+v.id+'/rota';
+  assert.equal((await request("PATCH",url,a.usuarioId,dados)).status,403);
+  const res=await request("PATCH",url,operadorId,dados);assert.equal(res.status,200,await res.text());
+  const ida=await prisma.participacaoTrecho.findUniqueOrThrow({where:{id:ps[0].id},include:{origem:true}});
+  const volta=await prisma.participacaoTrecho.findUniqueOrThrow({where:{id:ps[1].id},include:{origem:true,destino:true}});
+  assert.equal(ida.status,"CANCELADA");assert.equal(ida.origemId,ps[0].origemId);assert.equal(ida.origem.ativa,false);
+  assert.equal(volta.status,"CONFIRMADA");assert.equal(volta.origem.pontoParadaId,ponto.id);assert.equal(volta.origem.ativa,true);
+  assert.equal((await prisma.carteira.findUniqueOrThrow({where:{estudanteId:a.id}})).saldo.toFixed(2),"98.00");
+  const idaPontos=await prisma.paradaTrecho.findMany({where:{trechoId:v.trechos[0].id,ativa:true},orderBy:{ordem:"asc"}});
+  const voltaPontos=await prisma.paradaTrecho.findMany({where:{trechoId:v.trechos[1].id,ativa:true},orderBy:{ordem:"asc"}});
+  assert.deepEqual(voltaPontos.map(p=>p.pontoParadaId),idaPontos.map(p=>p.pontoParadaId).reverse());
+  assert.equal((await (await request("GET",'/trechos/'+v.trechos[0].id,a.usuarioId)).json() as any).paradas.length,3);
+  const b=await aluno();await assert.rejects(inscricoes.inscrever(v.trechos[0].id,b.usuarioId,entrada(v.trechos[0])),/Origem/);
+  assert.equal((await request("PATCH",url,operadorId,dados)).status,409);
+  assert.equal(await prisma.movimentacaoCarteira.count({where:{carteiraId:a.carteira!.id,tipo:"ESTORNO"}}),1);
+});
+
+test("troca preserva pontos ainda validos e bloqueia trecho iniciado ou resolucao alheia", async()=>{
+  const v=await publicar(),a=await aluno();const t=v.trechos[0];
+  const p=await inscricoes.inscrever(t.id,a.usuarioId,entrada(t));const {rota}=await rotaAlternativa(true);
+  const apiRota=await import("../src/modules/operacao/rota.service");
+  await assert.rejects(apiRota.alterarRotaPublicada(v.id,operadorId,{rotaId:rota.id,motivo:"Nova rota",resolucoes:[{participacaoId:"00000000-0000-4000-8000-000000000099",acao:"CANCELAR",motivo:"Alheia"}]}),/participação ativa/);
+  await apiRota.alterarRotaPublicada(v.id,operadorId,{rotaId:rota.id,motivo:"Novo percurso",resolucoes:[]});
+  const atual=await prisma.participacaoTrecho.findUniqueOrThrow({where:{id:p.id},include:{origem:true,destino:true}});
+  assert.equal(atual.origem.pontoParadaId,pontos[0]);assert.equal(atual.destino.pontoParadaId,pontos[2]);assert.notEqual(atual.origemId,p.origemId);
+  assert.equal((await prisma.carteira.findUniqueOrThrow({where:{estudanteId:a.id}})).saldo.toFixed(2),"98.00");
+  await execucao.iniciar(t.id,operadorId);
+  await assert.rejects(apiRota.alterarRotaPublicada(v.id,operadorId,{rotaId:v.rotaId,motivo:"Voltar rota",resolucoes:[]}),/não iniciadas/);
+});

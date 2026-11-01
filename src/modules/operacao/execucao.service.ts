@@ -5,7 +5,7 @@ import { JWT_SECRET } from "../auth/auth.config";
 import { embarqueSchema, reabrirSchema } from "./operacao.schemas";
 import { transacao, trechoTx, exigir, notificar, cancelarTx, atualizarViagem, semestreTx, type Ator, type Tx } from "./operacao.shared";
 import { avaliarDisciplinaTx } from "./disciplina.service";
-import { validarRecurso } from "./recursos.service";
+import { validarRecurso, validarAlocacao } from "./recursos.service";
 
 export async function expirarEsperaTx(tx: Tx, trechoId: string) {
   for (const p of await tx.participacaoTrecho.findMany({ where: { trechoId, status: "EM_ESPERA" }, include: { estudante: { select: { usuarioId: true } } } })) {
@@ -20,13 +20,13 @@ export function iniciar(id: string, operadorId: string) {
     const t = await trechoTx(tx, id);
     if (t.status === "EM_ANDAMENTO") return t;
     exigir(["ABERTO", "FECHADO"].includes(t.status), "Trecho não pode ser iniciado");
-    exigir(t.motoristaId && t.veiculoId, "Recursos ausentes");
-    await validarRecurso(tx, t, t.motoristaId, t.veiculoId);
-    if (t.motoristaExtraId && t.veiculoExtraId) await validarRecurso(tx, t, t.motoristaExtraId, t.veiculoExtraId);
+    await validarAlocacao(tx, t);
     await semestreTx(tx, t.saidaPrevistaEm);
+    const inicio = new Date();
+    await tx.participacaoTrecho.updateMany({ where: { trechoId: id, status: "CONFIRMADA", confirmacaoTardia: true, limiteEstornoEm: { gt: inicio } }, data: { limiteEstornoEm: inicio } });
     await expirarEsperaTx(tx, id);
     await tx.convocacaoVan.updateMany({ where: { trechoId: id, status: "PENDENTE" }, data: { status: "CANCELADA", respondidaEm: new Date() } });
-    const atual = await tx.trechoViagem.update({ where: { id }, data: { status: "EM_ANDAMENTO", iniciadoEm: new Date(), inscricoesSuspensas: true } });
+    const atual = await tx.trechoViagem.update({ where: { id }, data: { status: "EM_ANDAMENTO", iniciadoEm: inicio, inscricoesSuspensas: true } });
     await tx.alteracaoTrecho.create({ data: { trechoId: id, motivo: "Início do trecho", realizadaPorId: operadorId,
       dadosAnteriores: { status: t.status }, dadosNovos: { status: atual.status } } });
     await atualizarViagem(tx, t.viagemId);
@@ -101,6 +101,7 @@ export function alterarHorario(id: string, dados: z.infer<typeof reabrirSchema>,
       saidaPrevistaEm: saida, chegadaPrevistaEm: chegada, limiteConfirmacaoEm: limite,
       limiteCancelamentoEm: limite, inscricoesSuspensas: suspensas, status: suspensas ? "FECHADO" : "ABERTO",
     } });
+    await tx.participacaoTrecho.updateMany({ where: { trechoId: id, status: "CONFIRMADA", confirmacaoTardia: true, limiteEstornoEm: { gt: saida } }, data: { limiteEstornoEm: saida } });
     for (const p of await tx.participacaoTrecho.findMany({ where: { trechoId: id, status: { in: ["CONFIRMADA", "EM_ESPERA"] } }, include: { estudante: { select: { usuarioId: true } } } })) {
       await notificar(tx, p.estudante.usuarioId, `horario:${id}:${atual.atualizadoEm.toISOString()}:${p.id}`, "Horário alterado", `Confira o novo horário: ${saida.toISOString()}.`);
     }

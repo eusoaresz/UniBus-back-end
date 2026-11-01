@@ -52,7 +52,7 @@ after(async () => {
   rmdirSync(diretorio);
 });
 test("somente operador altera dados pessoais, com auditoria e sem alterar carteira ou aprovação", async () => {
-  for (const path of ["/usuarios/me", `/usuarios/${aluno}/dados`]) assert.equal((await api("PATCH", path, aluno, { nome: "Outro", motivo: "Correção" })).status, 403);
+  for (const path of [`/usuarios/${aluno}/dados`]) assert.equal((await api("PATCH", path, aluno, { nome: "Outro", motivo: "Correção" })).status, 403);
   const res = await api("PATCH", `/usuarios/${aluno}/dados`, op, { nome: "Aluno corrigido", dataNascimento: "2004-03-20", estudante: { curso: "Computação", cidadeOrigemId: cidade, unidadeEnsinoId: unidade }, motivo: "Correção cadastral solicitada" });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   assert.equal(res.body.dataNascimento, "2004-03-20");
@@ -126,4 +126,13 @@ test("upload rejeita conteúdo falso e tamanho excessivo e limpa arquivo em falh
   const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: "red" } }).png().toBuffer();
   assert.equal((await upload(op, png, "00000000-0000-4000-8000-000000000099")).status, 404);
   assert.equal(readdirSync(diretorio).length, 0);
+});
+
+test("autoedicao permite nome e telefone, rejeita demais dados e preserva carteira", async () => {
+  const antes=await prisma.carteira.findUniqueOrThrow({where:{estudanteId:estudante}});
+  const res=await api("PATCH","/usuarios/me",aluno,{nome:"Aluno atualizado",telefone:"(53) 99999-9999"});
+  assert.equal(res.status,200);assert.equal(res.body.nome,"Aluno atualizado");assert.equal(res.body.telefone,"53999999999");
+  for(const body of [{email:"outro@example.com"},{dataNascimento:"2000-01-01"},{estudante:{curso:"Outro"}},{perfil:"OPERADOR"},{fotoChave:"arquivo"},{usuarioId:op,nome:"Indevido"}]) assert.equal((await api("PATCH","/usuarios/me",aluno,body)).status,400);
+  const depois=await prisma.carteira.findUniqueOrThrow({where:{estudanteId:estudante}});
+  assert.equal(depois.id,antes.id);assert.equal(depois.saldo.toFixed(2),antes.saldo.toFixed(2));
 });

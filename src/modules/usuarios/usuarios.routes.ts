@@ -7,7 +7,7 @@ import { limitarTentativas } from "../../shared/middlewares/rate-limit";
 const router = Router();
 router.use(verificarToken);
 router.get("/me", controller.me);
-router.patch("/me", exigirOperador, controller.atualizarMe);
+router.patch("/me", controller.atualizarMe);
 router.get("/me/foto", controller.consultarFoto);
 router.get("/:id/foto", controller.consultarFoto);
 router.use(exigirOperador);

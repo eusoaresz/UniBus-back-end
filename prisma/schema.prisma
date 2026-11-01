@@ -630,6 +630,8 @@ model TrechoViagem {
 model ParadaTrecho {
   id String @id @default(uuid()) @db.Uuid
 
+  versao     Int     @default(1)
+  ativa      Boolean @default(true)
   ordem      Int
   nome       String
   cidade     String
@@ -649,8 +651,8 @@ model ParadaTrecho {
 
   desembarquesPrevistos ParticipacaoTrecho[] @relation("DestinoParticipacao")
 
-  @@unique([trechoId, pontoParadaId])
-  @@unique([trechoId, ordem])
+  @@unique([trechoId, versao, pontoParadaId])
+  @@unique([trechoId, versao, ordem])
   @@index([trechoId])
   @@index([pontoParadaId])
 }

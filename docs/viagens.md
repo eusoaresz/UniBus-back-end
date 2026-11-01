@@ -1,6 +1,6 @@
 # Viagens: rascunhos
 
-Esta etapa implementa criação, listagem, consulta e edição de rascunhos. Publicação, alocação de veículos, inscrições, fila, cobrança, embarque e disciplina ainda não estão disponíveis pela API. A modelagem prepara esses próximos fluxos.
+Esta etapa implementa criação, listagem, consulta e edição de rascunhos. Publicação, alocação, inscrições, fila, cobrança, embarque e disciplina são atendidos pelo módulo separado de operação, descrito em operacao.md. As rotas deste documento continuam restritas aos rascunhos.
 
 ## Rotas
 
