@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import type { z } from "zod";
 import { prisma } from "../../../lib/prisma";
 import { transporter, mailFrom } from "../../../lib/mailer";
@@ -13,13 +13,18 @@ const hashFicticio = bcrypt.hash("credencial-interna-sem-usuario", 10);
 export const mensagemRecuperacao = "Se o e-mail estiver cadastrado, você receberá o código de recuperação.";
 
 export async function login({ email, senha }: z.infer<typeof loginSchema>) {
+  const emitidoEm = Date.now();
   const usuario = await prisma.usuario.findUnique({
     where: { email }, select: { id: true, senhaHash: true, status: true, bloqueioDisciplinarAte: true },
   });
   const valida = await bcrypt.compare(senha, usuario?.senhaHash ?? await hashFicticio);
   if (!usuario || !usuario.senhaHash || !valida) throw new HttpError(401, "Email ou senha inválidos");
   if (usuario.status !== "ATIVA" || (usuario.bloqueioDisciplinarAte && usuario.bloqueioDisciplinarAte > new Date())) throw new HttpError(403, "Conta sem permissão para acesso");
-  return { token: jwt.sign({ id: usuario.id }, JWT_SECRET, { algorithm: "HS256", expiresIn: "1h" }) };
+  return { token: jwt.sign({ id: usuario.id, emitidoEm }, JWT_SECRET, { algorithm: "HS256", jwtid: randomUUID(), expiresIn: "1h" }) };
+}
+
+export async function logout(usuarioId: string, tokenHash: string, expiraEm: Date) {
+  await prisma.tokenRevogado.createMany({ data: [{ tokenHash, usuarioId, expiraEm }], skipDuplicates: true });
 }
 
 export async function recuperarSenha(email: string) {
@@ -66,6 +71,6 @@ export async function redefinirSenha({ email, codigo, novaSenha }: z.infer<typeo
       data: { utilizadoEm: new Date() },
     });
     if (consumo.count !== 1) throw invalido();
-    await tx.usuario.update({ where: { id: usuario.id }, data: { senhaHash, deveAlterarSenha: false } });
+    await tx.usuario.update({ where: { id: usuario.id }, data: { senhaHash, deveAlterarSenha: false, tokensRevogadosAte: new Date() } });
   });
 }

@@ -22,7 +22,7 @@ export async function consultar(req: ReqUsuario, res: Response) {
 
 export async function editar(req: ReqUsuario, res: Response) {
   const id = schemas.estudanteIdSchema.parse(req.params.id);
-  res.json(await service.editarEstudante(id, schemas.editarEstudanteSchema.parse(req.body)));
+  res.json(await service.editarEstudante(id, schemas.editarEstudanteSchema.parse(req.body), req.usuarioId!));
 }
 
 export async function aprovar(req: ReqUsuario, res: Response) {
@@ -30,7 +30,7 @@ export async function aprovar(req: ReqUsuario, res: Response) {
   res.json(await service.aprovarEstudante(
     schemas.estudanteIdSchema.parse(req.params.id),
     req.usuarioId!,
-    dados.observacao,
+    dados.motivo,
   ));
 }
 
@@ -53,10 +53,10 @@ export async function suspender(req: ReqUsuario, res: Response) {
 }
 
 export async function reativar(req: ReqUsuario, res: Response) {
-  schemas.reativarEstudanteSchema.parse(req.body ?? {});
+  const dados = schemas.reativarEstudanteSchema.parse(req.body ?? {});
   res.json(await service.reativarEstudante(
     schemas.estudanteIdSchema.parse(req.params.id),
-    req.usuarioId!,
+    req.usuarioId!, dados.motivo,
   ));
 }
 

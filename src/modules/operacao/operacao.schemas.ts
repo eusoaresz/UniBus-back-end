@@ -15,6 +15,7 @@ export const inscricaoSchema = z.strictObject({ origemId: idSchema, destinoId: i
 export const inscricaoDuplaSchema = z.strictObject({ trechos: z.array(z.strictObject({
   trechoId: idSchema, origemId: idSchema, destinoId: idSchema,
 })).length(2) }).refine((d) => d.trechos[0].trechoId !== d.trechos[1].trechoId, "Informe trechos distintos");
+export const incluirOperadorSchema = inscricaoSchema.extend({ estudanteId: idSchema, motivo: z.string().trim().min(3).max(1000) });
 export const confirmarOperadorSchema = motivoSchema.extend({ estudanteId: idSchema });
 export const reabrirSchema = motivoSchema.extend({
   saidaPrevistaEm: z.iso.datetime({ offset: true }), chegadaPrevistaEm: z.iso.datetime({ offset: true }),
@@ -32,3 +33,11 @@ export const semestreSchema = z.strictObject({ nome: z.string().trim().min(3).ma
 export const justificativaSchema = z.strictObject({ justificativa: z.string().trim().min(3).max(3000) });
 export const analiseFaltaSchema = motivoSchema.extend({ aprovar: z.boolean() });
 export const liberarDisciplinaSchema = motivoSchema.extend({ semestreId: idSchema });
+
+export const alterarRotaSchema = motivoSchema.extend({
+  rotaId: idSchema,
+  resolucoes: z.array(z.discriminatedUnion("acao", [
+    z.strictObject({ participacaoId: idSchema, acao: z.literal("REALOCAR"), origemPontoId: idSchema, destinoPontoId: idSchema }),
+    z.strictObject({ participacaoId: idSchema, acao: z.literal("CANCELAR"), motivo: z.string().trim().min(3).max(1000) }),
+  ])).max(500).default([]),
+}).refine((d) => new Set(d.resolucoes.map((r) => r.participacaoId)).size === d.resolucoes.length, "Informe uma resolução por participação");

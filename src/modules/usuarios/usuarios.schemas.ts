@@ -52,7 +52,8 @@ export const atualizarDadosSchema = z.strictObject({
   estudante: dadosAcademicosSchema.optional(),
   motivo: z.string().trim().min(3).max(1000),
 }).refine((dados) => Object.keys(dados).some((campo) => campo !== "motivo"), "Informe ao menos um dado para alteração");
-export const atualizarMeSchema = atualizarDadosSchema;
+export const atualizarMeSchema = z.strictObject({ nome: nome.optional(), telefone: telefone.optional() })
+  .refine((dados) => Object.keys(dados).length > 0, "Informe nome ou telefone");
 export const motivoPerfilSchema = z.strictObject({ motivo: z.string().trim().min(3).max(1000) });
 export const listarUsuariosSchema = z.strictObject({
   pagina: z.coerce.number().int().min(1).max(100000).default(1),
@@ -61,4 +62,4 @@ export const listarUsuariosSchema = z.strictObject({
   status: z.enum(["AGUARDANDO_ATIVACAO", "ATIVA", "BLOQUEADA", "INATIVA"]).optional(),
 });
 export const idSchema = z.string().uuid();
-export const statusSchema = z.strictObject({ status: z.enum(["ATIVA", "BLOQUEADA", "INATIVA"]) });
+export const statusSchema = z.strictObject({ status: z.enum(["ATIVA", "BLOQUEADA", "INATIVA"]), motivo: z.string().trim().min(3).max(1000) });

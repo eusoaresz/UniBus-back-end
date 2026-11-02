@@ -1,9 +1,14 @@
 import type { Request, Response } from "express";
 import * as schemas from "./auth.schemas";
 import * as service from "./auth.service";
+import type { ReqUsuario } from "../../shared/middlewares/auth";
 
 export async function login(req: Request, res: Response) {
   res.json(await service.login(schemas.loginSchema.parse(req.body)));
+}
+export async function logout(req: ReqUsuario, res: Response) {
+  await service.logout(req.usuarioId!, req.tokenHash!, req.tokenExpiraEm!);
+  res.status(204).end();
 }
 export async function recuperar(req: Request, res: Response) {
   const { email } = schemas.recuperarSchema.parse(req.body);

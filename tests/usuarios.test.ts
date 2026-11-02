@@ -33,6 +33,14 @@ function substituirMetodo(nome: "findUnique" | "findFirst" | "findMany" | "creat
 
 before(async () => {
   prisma = (await import("../lib/prisma")).prisma;
+  const revogadoOriginal = prisma.tokenRevogado.findUnique;
+  Object.assign(prisma.tokenRevogado, { findUnique: async () => null });
+  restaurar.push(() => { prisma.tokenRevogado.findUnique = revogadoOriginal; });
+  const txOriginal = prisma.$transaction;
+  const auditoriaOriginal = prisma.alteracaoPerfil.create;
+  Object.assign(prisma, { $transaction: async (fn: any) => fn(prisma) });
+  Object.assign(prisma.alteracaoPerfil, { create: async (args: any) => args.data });
+  restaurar.push(() => { prisma.$transaction = txOriginal; prisma.alteracaoPerfil.create = auditoriaOriginal; });
   const app = (await import("../src/app")).default;
   senhaHash = await bcrypt.hash("SenhaForte123!", 4);
   const selecionar = (registro: any, select: any) => registro && Object.fromEntries(
@@ -240,11 +248,12 @@ test("estudante não consulta outro usuário", async () => {
   assert.equal(res.status, 403);
 });
 
-test("estudante não pode alterar dados próprios", async () => {
+test("estudante altera somente nome e telefone próprios", async () => {
   usuario!.perfil = "ESTUDANTE";
   const res = await requisicao("PATCH", "/api/v1/usuarios/me", token(), { nome: "Nome atualizado" });
-  assert.equal(res.status, 403);
-  assert.equal(ultimaAtualizacao, undefined);
+  assert.equal(res.status, 200);
+  assert.equal(ultimaAtualizacao.where.id, id);
+  assert.deepEqual(ultimaAtualizacao.data, { nome: "Nome atualizado" });
 });
 
 for (const body of [{ perfil: "OPERADOR" }, { status: "ATIVA" }, { cpf: cadastro.cpf }, { email: "outro@example.com" }, {}]) {
@@ -257,14 +266,14 @@ for (const body of [{ perfil: "OPERADOR" }, { status: "ATIVA" }, { cpf: cadastro
 
 test("operador pode desativar outra conta preservando o registro", async () => {
   const outroId = "00000000-0000-4000-8000-000000000002";
-  const res = await requisicao("PATCH", `/api/v1/usuarios/${outroId}/status`, token(), { status: "INATIVA" });
+  const res = await requisicao("PATCH", `/api/v1/usuarios/${outroId}/status`, token(), { status: "INATIVA", motivo: "Desativação administrativa" });
   assert.equal(res.status, 200);
   assert.deepEqual(ultimaAtualizacao.data, { status: "INATIVA" });
   assert.equal(ultimaAtualizacao.where.id, outroId);
 });
 
 test("operador não pode alterar o próprio status", async () => {
-  const res = await requisicao("PATCH", `/api/v1/usuarios/${id}/status`, token(), { status: "INATIVA" });
+  const res = await requisicao("PATCH", `/api/v1/usuarios/${id}/status`, token(), { status: "INATIVA", motivo: "Desativação administrativa" });
   assert.equal(res.status, 409);
   assert.equal(ultimaAtualizacao, undefined);
 });

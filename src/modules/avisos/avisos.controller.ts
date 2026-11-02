@@ -27,10 +27,10 @@ export async function consultar(req: ReqUsuario, res: Response) {
 
 export async function editar(req: ReqUsuario, res: Response) {
   const id = schemas.avisoIdSchema.parse(req.params.id);
-  res.json(await service.editarAviso(id, schemas.editarAvisoSchema.parse(req.body)));
+  res.json(await service.editarAviso(id, schemas.editarAvisoSchema.parse(req.body), req.usuarioId!));
 }
 
 export async function alterarStatus(req: ReqUsuario, res: Response) {
   const id = schemas.avisoIdSchema.parse(req.params.id);
-  res.json(await service.alterarStatus(id, schemas.alterarStatusAvisoSchema.parse(req.body)));
+  res.json(await service.alterarStatus(id, schemas.alterarStatusAvisoSchema.parse(req.body), req.usuarioId!));
 }

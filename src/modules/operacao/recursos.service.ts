@@ -25,6 +25,21 @@ export async function validarRecurso(tx: Tx, trecho: Trecho, motoristaId: string
   return { motorista, veiculo };
 }
 
+export async function validarAlocacao(tx: Tx, t: Trecho) {
+  exigir(t.motoristaId && t.veiculoId && t.capacidade, "Aloque motorista e veículo antes de publicar ou iniciar");
+  const principal = await validarRecurso(tx, t, t.motoristaId, t.veiculoId);
+  exigir(t.capacidade <= principal.veiculo.capacidade, "Capacidade do veículo foi reduzida; revise a alocação");
+  exigir(Boolean(t.motoristaExtraId) === Boolean(t.veiculoExtraId), "Alocação extra incompleta");
+  if (t.motoristaExtraId && t.veiculoExtraId) {
+    const extra = await validarRecurso(tx, t, t.motoristaExtraId, t.veiculoExtraId);
+    exigir(t.capacidadeExtra && t.capacidadeExtra <= extra.veiculo.capacidade, "Capacidade do veículo extra foi reduzida; revise a alocação");
+  } else exigir(!t.capacidadeExtra, "Capacidade extra sem recursos; revise a alocação");
+  const ocupacao = await tx.participacaoTrecho.groupBy({ by: ["alocacao"], where: { trechoId: t.id, status: "CONFIRMADA" }, _count: { _all: true } });
+  for (const grupo of ocupacao) {
+    exigir(grupo.alocacao && grupo._count._all <= (grupo.alocacao === "VEICULO" ? t.capacidade : t.capacidadeExtra ?? 0), "Confirmados sem capacidade suficiente; revise a alocação");
+  }
+}
+
 export async function alocarTx(tx: Tx, id: string, dados: z.infer<typeof alocacaoSchema>, atorId: string) {
   const trecho = await trechoTx(tx, id);
   exigir(["RASCUNHO", "ABERTO", "FECHADO"].includes(trecho.status), "Trecho não permite alteração de recursos");
@@ -65,6 +80,7 @@ export function publicar(id: string, atorId: string) {
     const viagem = await tx.viagem.findUnique({ where: { id }, include: { trechos: true, rota: { include: { paradas: { include: { pontoParada: true } } } } } });
     exigir(viagem, "Viagem não encontrada", 404);
     if (viagem.status === "PROGRAMADA") return viagem;
+    exigir(!viagem.revisaoRotaPendente, "Revise e salve o rascunho após a alteração da rota antes de publicar");
     exigir(viagem.status === "RASCUNHO" && viagem.trechos.length === 2 && new Set(viagem.trechos.map((t) => t.sentido)).size === 2, "Publicação exige ida e volta em rascunho");
     const ida = viagem.trechos.find((t) => t.sentido === "IDA")!;
     const volta = viagem.trechos.find((t) => t.sentido === "VOLTA")!;
@@ -73,11 +89,7 @@ export function publicar(id: string, atorId: string) {
     for (const t of viagem.trechos) {
       exigir(t.status === "RASCUNHO" && t.saidaPrevistaEm > new Date(), "Trecho inválido para publicação");
       await semestreTx(tx, t.saidaPrevistaEm);
-      exigir(t.motoristaId && t.veiculoId && t.capacidade, "Aloque motorista e veículo antes de publicar");
-      const principal = await validarRecurso(tx, { ...t, viagem }, t.motoristaId, t.veiculoId);
-      exigir(t.capacidade <= principal.veiculo.capacidade, "Capacidade do veículo foi reduzida; revise a alocação");
-      exigir(Boolean(t.motoristaExtraId) === Boolean(t.veiculoExtraId), "Alocação extra incompleta");
-      if (t.motoristaExtraId && t.veiculoExtraId) await validarRecurso(tx, { ...t, viagem }, t.motoristaExtraId, t.veiculoExtraId);
+      await validarAlocacao(tx, { ...t, viagem });
       await tx.trechoViagem.update({ where: { id: t.id }, data: { status: "ABERTO" } });
       await tx.alteracaoTrecho.create({ data: { trechoId: t.id, motivo: "Publicação", realizadaPorId: atorId,
         dadosAnteriores: { status: t.status }, dadosNovos: { status: "ABERTO" } } });

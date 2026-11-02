@@ -1,6 +1,6 @@
 # Abrir o projeto para revisão
 
-Este pacote contém o backend UniBus com rascunhos de viagens e carteira manual em desenvolvimento. Não contém credenciais, histórico Git, node_modules, cliente Prisma gerado ou cópia do banco. Nenhuma alteração da carteira foi commitada ou aplicada ao Neon.
+Este pacote contém o backend UniBus com rascunhos de viagens e carteira manual em desenvolvimento. Não contém credenciais, histórico Git, node_modules, cliente Prisma gerado ou cópia do banco. A base da carteira foi versionada no commit 6a79aff e integrada à dev pelo PR #8. A aplicação das migrações no Neon não foi realizada nesta sessão; verifique o estado do banco compartilhado com ambos os desenvolvedores.
 
 1. Extraia o ZIP e abra a pasta UniBus-back-end no editor.
 2. Instale Node.js 24 e tenha um PostgreSQL local vazio disponível. Execute `npm ci` nessa pasta.

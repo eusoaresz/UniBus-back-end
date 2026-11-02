@@ -78,7 +78,7 @@ Motorista vê passageiros somente da sua alocação. Embarque exige trecho em an
 
 Após o corte, só o operador confirma, com motivo, vaga, saldo e respeito à fila. Todos os elegíveis anteriores são considerados primeiro. Confirmação excepcional tardia concede cancelamento por 30 minutos, limitado à saída prevista e ao início real se ocorrer antes. Mudança de horário não renova essa janela. Adiamento depois do fechamento não reabre confirmação/cancelamento sem `reabrir: true`; o novo corte precisa estar no futuro. A alteração operacional de horário preserva a data local da ida e não aceita sobreposição com o outro trecho.
 
-Interrupção após início retorna conflito para análise manual; não presume estorno universal. Este módulo não permite mudar rota/paradas de viagem publicada; essa alteração exige fluxo próprio para resolver pontos dos passageiros antes de remover paradas utilizadas. A edição de rascunhos permanece disponível.
+Interrupção após início retorna conflito para análise manual; não presume estorno universal. A troca de rota publicada usa o fluxo conjunto descrito abaixo, com resolução das participações afetadas. A edição de rascunhos permanece disponível.
 
 ## Van e processamento automático
 
@@ -108,3 +108,43 @@ Bloqueio disciplinar tem fim no semestre e é separado de Usuario.status. Encerr
 Testes de integração usam Prisma e PGlite com migrações reais, incluindo saldo, estorno, fila, QR, van, disciplina, proteção de acesso e rollback conjunto de ida/volta. PGlite serializa transações na conexão; não equivale a teste de carga/concorrência de PostgreSQL remoto com múltiplas conexões. Fazer esse ensaio e revisar migrações antes de uso financeiro real. As notificações são internas ao painel; canais externos e interface móvel não são parte desta implementação.
 
 Configuração, recursos operacionais reais e semestre precisam ser cadastrados antes dos testes manuais. Não executar seed de dados fictícios no Neon compartilhado. Nenhum commit/push ou aplicação de migração é executado pelos testes.
+
+## Alinhamento de 31/10/2026
+
+POST `/api/v1/operacao/trechos/:id/inclusoes-excepcionais` é exclusivo de operador ativo e recebe `estudanteId`, `origemId`, `destinoId` e `motivo`. Os pontos são ParadaTrecho, pertencem ao trecho e respeitam sua ordem. A inclusão pode ocorrer até a saída prevista, enquanto o trecho não iniciou. A participação entra no fim da fila; a promoção respeita todos os elegíveis anteriores. Sem vaga ou saldo, a nova participação permanece em espera e não é cobrada. Repetir a mesma inclusão ativa preserva posição e não duplica cobrança; trocar pontos exige cancelamento prévio. Cadastro inelegível ou pontos inválidos são rejeitados sem criar inscrição parcial.
+
+Publicação e início revalidam capacidades do veículo normal e do extra em relação à alocação e aos confirmados. Capacidade reduzida exige revisão da alocação, acomodando todos com os recursos disponíveis antes de prosseguir.
+
+Antecipar a saída reduz o limite individual de estorno tardio ao menor prazo já concedido ou nova saída. Adiar não o amplia. Início real antecipado também encerra a janela. A ação de cancelamento verifica a saída prevista mesmo quando o início ainda não foi registrado.
+
+## Troca de rota publicada
+
+`PATCH /api/v1/operacao/viagens/:id/rota`, exclusivo de operador ativo, altera ida e volta na mesma transação, mantendo a sequência inversa na volta. Exige viagem PROGRAMADA e ambos os trechos ABERTO ou FECHADO, antes das saídas previstas e sem início registrado.
+
+```json
+{
+  "rotaId": "UUID_DA_NOVA_ROTA",
+  "motivo": "Alteração operacional da rota",
+  "resolucoes": [
+    {
+      "participacaoId": "UUID_DA_PARTICIPACAO",
+      "acao": "REALOCAR",
+      "origemPontoId": "UUID_DO_PONTO_DE_EMBARQUE",
+      "destinoPontoId": "UUID_DO_PONTO_DE_DESEMBARQUE"
+    },
+    {
+      "participacaoId": "UUID_DE_OUTRA_PARTICIPACAO",
+      "acao": "CANCELAR",
+      "motivo": "Não há parada adequada para este estudante"
+    }
+  ]
+}
+```
+
+Os IDs de origemPontoId e destinoPontoId são de PontoParada da nova rota. Diferem dos IDs de ParadaTrecho usados na inscrição. Resoluções devem referenciar participações ativas desta viagem, sem duplicações. A lista pode ser omitida quando todos os pontos existentes continuam válidos e na ordem correta.
+
+Participações não mencionadas preservam seus pontos quando possível. Se algum embarque/desembarque ficar inválido, toda a alteração é rejeitada. Cancelamento explícito exige motivo e estorna integralmente a confirmação; espera não gera estorno porque não foi cobrada. Remapeamento preserva fila, alocação e cobrança. A promoção posterior respeita o prazo e a fila, sem confirmação automática após o corte.
+
+As paradas antigas permanecem no histórico, com versão e marca de inatividade. Consultas operacionais mostram apenas a versão ativa; novas inscrições não podem usar IDs antigos. Participações canceladas mantêm suas referências históricas. Auditoria, notificações internas, remapeamentos, cancelamentos e estornos pertencem à mesma transação: uma falha em qualquer trecho desfaz todos os efeitos. Informar a rota já atual retorna conflito, sem repetir estorno.
+
+A migração `20261031000400_historico_paradas` adiciona versão e atividade às paradas existentes, preservando os registros. Foi validada no banco isolado dos testes; sua aplicação no Neon compartilhado continua pendente de coordenação entre os desenvolvedores.

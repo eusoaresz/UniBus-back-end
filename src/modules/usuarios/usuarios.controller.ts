@@ -16,7 +16,7 @@ export async function me(req: ReqUsuario, res: Response) {
   res.json(await service.consultarUsuario(req.usuarioId!));
 }
 export async function atualizarMe(req: ReqUsuario, res: Response) {
-  res.json(await atualizarDadosUsuario(req.usuarioId!, req.usuarioId!, schemas.atualizarMeSchema.parse(req.body)));
+  res.json(await service.atualizarMe(req.usuarioId!, schemas.atualizarMeSchema.parse(req.body)));
 }
 export async function atualizarDados(req: ReqUsuario, res: Response) {
   res.json(await atualizarDadosUsuario(schemas.idSchema.parse(req.params.id), req.usuarioId!, schemas.atualizarDadosSchema.parse(req.body)));

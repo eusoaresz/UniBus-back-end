@@ -14,22 +14,23 @@ export const criarEstudanteSchema = criarUsuarioSchema.omit({ perfil: true }).ex
 });
 
 export const editarEstudanteSchema = z.strictObject({
+  motivo: z.string().trim().min(3).max(1000),
   matricula: matricula.optional(),
   previsaoConclusao: previsaoConclusao.optional(),
   unidadeEnsinoId: unidadeEnsinoId.optional(),
-}).refine((dados) => Object.keys(dados).length > 0, "Informe ao menos um campo para alteração");
+}).refine((dados) => Object.keys(dados).some(campo => campo !== "motivo"), "Informe ao menos um campo para alteração");
 
 export const estudanteIdSchema = z.string().uuid();
 
 export const listarEstudantesSchema = z.strictObject({
   pagina: z.coerce.number().int().min(1).max(100000).default(1),
   limite: z.coerce.number().int().min(1).max(100).default(20),
-  statusCadastro: z.enum(["PENDENTE", "APROVADO", "REJEITADO", "SUSPENSO"]).optional(),
+  statusCadastro: z.enum(["PENDENTE", "APROVADO", "REJEITADO", "SUSPENSO", "ENCERRADO"]).optional(),
   unidadeEnsinoId: unidadeEnsinoId.optional(),
 });
 
 export const aprovarEstudanteSchema = z.strictObject({
-  observacao: z.string().trim().min(1).max(1000).optional(),
+  motivo: z.string().trim().min(3).max(1000),
 });
 
 export const justificarEstudanteSchema = z.strictObject({
@@ -48,7 +49,7 @@ export const listarComprovantesSchema = z.strictObject({
   limite: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const reativarEstudanteSchema = z.strictObject({});
+export const reativarEstudanteSchema = justificarEstudanteSchema;
 
 export const arquivoComprovanteSchema = z.strictObject({
   nomeOriginal: z.string().trim().min(1).max(255)

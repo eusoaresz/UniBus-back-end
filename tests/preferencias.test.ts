@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { atualizarPreferenciasSchema } from "../src/modules/preferencias/preferencias.schemas";
 import { preferenciasDto, preferenciasSelect } from "../src/modules/preferencias/preferencias.dto";
 import { Prisma } from "../generated/prisma";
-import { prisma } from "../lib/prisma";
-import * as service from "../src/modules/preferencias/preferencias.service";
+let prisma: typeof import("../lib/prisma").prisma;
+let service: typeof import("../src/modules/preferencias/preferencias.service");
 import { HttpError } from "../src/shared/errors/http-error";
 
 const rotaId = "00000000-0000-4000-8000-000000000001";
@@ -33,7 +33,10 @@ function registro(usuarioId: string, dados: { turnos: string[]; rotaIds: string[
   };
 }
 
-before(() => {
+before(async () => {
+  process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
+  prisma = (await import("../lib/prisma")).prisma;
+  service = await import("../src/modules/preferencias/preferencias.service");
   substituir(prisma.rota, "findMany", async (args: any) => {
     const ids = args.where?.id?.in;
     const ativos = args.where?.ativa === true;

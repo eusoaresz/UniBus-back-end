@@ -50,12 +50,13 @@ export async function promoverTx(tx: Tx, trechoId: string, agora: Date, operador
   }
 }
 
-async function inscreverTx(tx: Tx, trechoId: string, usuarioId: string, dados: z.infer<typeof inscricaoSchema>, agora: Date) {
+async function inscreverTx(tx: Tx, trechoId: string, usuarioId: string, dados: z.infer<typeof inscricaoSchema>, agora: Date, operador?: { id: string; motivo: string }) {
   const t = await trechoTx(tx, trechoId);
-  exigir(t.status === "ABERTO" && !t.inscricoesSuspensas && agora <= t.limiteConfirmacaoEm && agora < t.saidaPrevistaEm, "Prazo de inscrição encerrado ou trecho indisponível");
+  if (operador) exigir(["ABERTO", "FECHADO"].includes(t.status) && !t.iniciadoEm && agora < t.saidaPrevistaEm, "Trecho indisponível para inclusão excepcional");
+  else exigir(t.status === "ABERTO" && !t.inscricoesSuspensas && agora <= t.limiteConfirmacaoEm && agora < t.saidaPrevistaEm, "Prazo de inscrição encerrado ou trecho indisponível");
   const e = await tx.estudante.findUnique({ where: { usuarioId }, select: { id: true } });
   exigir(e && await elegivel(tx, e.id, agora), "Cadastro sem permissão para novas confirmações", 403);
-  const paradas = await tx.paradaTrecho.findMany({ where: { trechoId, id: { in: [dados.origemId, dados.destinoId] } } });
+  const paradas = await tx.paradaTrecho.findMany({ where: { trechoId, ativa: true, id: { in: [dados.origemId, dados.destinoId] } } });
   const origem = paradas.find((p) => p.id === dados.origemId);
   const destino = paradas.find((p) => p.id === dados.destinoId);
   exigir(origem && destino && origem.ordem < destino.ordem, "Origem e destino devem pertencer ao trecho e respeitar a ordem", 400);
@@ -70,9 +71,9 @@ async function inscreverTx(tx: Tx, trechoId: string, usuarioId: string, dados: z
     p = await tx.participacaoTrecho.create({ data: { trechoId, estudanteId: e.id, ...dados } });
   }
   if (p.status === "EM_ESPERA") {
-    await tx.alteracaoParticipacao.create({ data: { participacaoId: p.id, acao: "ENTRADA_FILA", realizadaPorId: usuarioId,
+    await tx.alteracaoParticipacao.create({ data: { participacaoId: p.id, acao: "ENTRADA_FILA", realizadaPorId: operador?.id ?? usuarioId, motivo: operador?.motivo,
       dadosNovos: { status: "EM_ESPERA", ordemFila: p.ordemFila.toString() } } });
-    await promoverTx(tx, trechoId, agora, undefined, e.id);
+    await promoverTx(tx, trechoId, agora, operador, e.id);
   }
   return tx.participacaoTrecho.findUniqueOrThrow({ where: { id: p.id }, select: participacaoSelect });
 }
@@ -90,6 +91,14 @@ export const inscreverDupla = (usuarioId: string, dados: z.infer<typeof inscrica
   exigir(resultado.every((p) => p.status === "CONFIRMADA"), "Ida e volta não puderam ser confirmadas juntas. Solicite separadamente para entrar em espera");
   return resultado;
 });
+
+export function incluirOperador(trechoId: string, operadorId: string, dados: { estudanteId: string; origemId: string; destinoId: string; motivo: string }) {
+  return transacao(async (tx) => {
+    const estudante = await tx.estudante.findUnique({ where: { id: dados.estudanteId }, select: { usuarioId: true } });
+    exigir(estudante, "Estudante não encontrado", 404);
+    return inscreverTx(tx, trechoId, estudante.usuarioId, { origemId: dados.origemId, destinoId: dados.destinoId }, new Date(), { id: operadorId, motivo: dados.motivo });
+  });
+}
 
 export function confirmarOperador(trechoId: string, estudanteId: string, operadorId: string, motivo: string) {
   return transacao(async (tx) => {
@@ -110,7 +119,7 @@ export function cancelarPropria(id: string, usuarioId: string) {
     exigir(p, "Participação não encontrada", 404);
     const agora = new Date();
     if (["CANCELADA", "EXPIRADA"].includes(p.status)) return tx.participacaoTrecho.findUniqueOrThrow({ where: { id }, select: participacaoSelect });
-    exigir(!p.trecho.iniciadoEm && ["ABERTO", "FECHADO"].includes(p.trecho.status), "Trecho não permite cancelamento");
+    exigir(!p.trecho.iniciadoEm && agora < p.trecho.saidaPrevistaEm && ["ABERTO", "FECHADO"].includes(p.trecho.status), "Trecho não permite cancelamento");
     const limite = p.confirmacaoTardia && p.limiteEstornoEm ? p.limiteEstornoEm : p.trecho.limiteCancelamentoEm;
     exigir(p.status === "EM_ESPERA" || ((p.confirmacaoTardia || !p.trecho.inscricoesSuspensas) && agora <= limite), "Prazo de cancelamento encerrado");
     await cancelarTx(tx, id, usuarioId, "Cancelamento solicitado pelo estudante");

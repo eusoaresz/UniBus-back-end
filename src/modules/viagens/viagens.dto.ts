@@ -1,7 +1,7 @@
 import { Prisma } from "../../../generated/prisma";
 
 export const viagemSelect = {
-  id: true, data: true, turno: true, rotaId: true, nomeRota: true, status: true,
+  id: true, data: true, turno: true, rotaId: true, nomeRota: true, status: true, revisaoRotaPendente: true,
   criadaPorId: true, criadoEm: true, atualizadoEm: true,
   trechos: {
     orderBy: { sentido: "asc" },
@@ -11,6 +11,7 @@ export const viagemSelect = {
       motoristaId: true, veiculoId: true, motoristaExtraId: true, veiculoExtraId: true,
       capacidade: true, capacidadeExtra: true, inscricoesSuspensas: true,
       paradas: {
+        where: { ativa: true },
         orderBy: { ordem: "asc" },
         select: { id: true, pontoParadaId: true, ordem: true, nome: true, cidade: true, endereco: true, referencia: true },
       },

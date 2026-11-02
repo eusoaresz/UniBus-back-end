@@ -10,7 +10,7 @@ Todas as rotas exigem conta ativa e `Authorization: Bearer <token>`.
 | GET | `/api/v1/avisos/gestao/:id` | Operador: consulta administrativa individual |
 | POST | `/api/v1/avisos` | Operador: publicar |
 | PATCH | `/api/v1/avisos/:id` | Operador: edição parcial |
-| PATCH | `/api/v1/avisos/:id/status` | Operador: arquivar/reativar com `{ "ativo": false }` ou `true` |
+| PATCH | `/api/v1/avisos/:id/status` | Operador: arquivar/reativar com `{ "ativo": false, "motivo": "Arquivamento" }` ou `true` |
 
 Edição utiliza PATCH, substituindo o PUT anterior. O endpoint comum também respeita o público para operadores; use gestão para administrar outros públicos.
 
@@ -44,3 +44,5 @@ npm test
 ```
 
 Os testes HTTP de avisos usam Prisma simulado. O teste de paridade aplica o histórico de migrações em PGlite isolado e compara colunas, índices e relações com o schema. Não há envio push ou e-mail neste módulo; esses canais exigem implementação própria de notificações.
+
+Edição e alteração de situação exigem motivo de 3 a 1000 caracteres. Criação, edição e arquivamento registram autor e estados em AlteracaoAviso, na mesma transação. Não há endpoint público de edição ou consulta dessa auditoria.

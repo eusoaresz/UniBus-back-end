@@ -28,7 +28,7 @@ function normalizar(texto: string) {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
 
-async function consultarRota(tx: Prisma.TransactionClient, id: string) {
+export async function consultarRota(tx: Prisma.TransactionClient, id: string) {
   const rota = await tx.rota.findUnique({
     where: { id },
     select: { nome: true, ativa: true, paradas: {
@@ -126,7 +126,7 @@ export function editarRascunho(id: string, dados: z.infer<typeof editarViagemRas
       });
     }
     return viagemDto(await tx.viagem.update({
-      where: { id }, data: { data: new Date(dados.data), turno: dados.turno, rotaId: dados.rotaId, nomeRota: rota.nome },
+      where: { id }, data: { data: new Date(dados.data), turno: dados.turno, rotaId: dados.rotaId, nomeRota: rota.nome, revisaoRotaPendente: false },
       select: viagemSelect,
     }));
   });
