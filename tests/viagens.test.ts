@@ -54,6 +54,7 @@ function viagem() {
 before(async () => {
   prisma = (await import("../lib/prisma")).prisma;
   substituir(prisma.usuario, "findUnique", async () => ({ id, perfil, status: conta }));
+  substituir(prisma.tokenRevogado, "findUnique", async () => null);
   substituir(prisma.rota, "findUnique", async () => rota);
   substituir(prisma.viagem, "findUnique", async () => registro);
   substituir(prisma.viagem, "findMany", async (args: any) => { listagem = args; return Array.from({ length: args.take }, viagem); });
@@ -94,7 +95,7 @@ after(async () => {
 });
 
 function requisicao(method: string, path = "", body?: unknown, autenticado = true) {
-  const token = jwt.sign({ id, perfil: "OPERADOR" }, process.env.JWT_SECRET!);
+  const token = jwt.sign({ id, perfil: "OPERADOR" }, process.env.JWT_SECRET!, { expiresIn: "1h" });
   return fetch(`${base}${path}`, {
     method, headers: { "Content-Type": "application/json", ...(autenticado ? { Authorization: `Bearer ${token}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),

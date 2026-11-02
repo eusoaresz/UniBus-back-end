@@ -25,7 +25,7 @@ let outroVeiculo: string;
 const cadastro = { identificacao: "Ônibus teste", placa: " abc-1234 ", tipo: "ONIBUS", capacidade: 40 };
 async function api(method: string, path: string, body?: unknown, id: string | null = op) {
   const res = await fetch(base + path, { method, headers: { "Content-Type": "application/json",
-    ...(id ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!)}` } : {}) },
+    ...(id ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` } : {}) },
   body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, body: await res.json() as any };
 }

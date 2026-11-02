@@ -42,6 +42,7 @@ before(async () => {
     restaurar.push(() => { alvo[chave] = original; });
   }
   substituir(prisma.usuario, "findUnique", async () => ({ id, email: "teste@example.com", perfil, status: "ATIVA" }));
+  substituir(prisma.tokenRevogado, "findUnique", async () => null);
   substituir(prisma.aviso, "findFirst", async (args: any) => {
     consultas.push(args); return aviso && corresponde(aviso, args.where) ? aviso : null;
   });
@@ -73,7 +74,7 @@ after(async () => {
 });
 async function request(method: string, path = "", body?: unknown, autenticado = true) {
   return fetch(base + path, { method, headers: { "Content-Type": "application/json",
-    ...(autenticado ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!)}` } : {}) },
+    ...(autenticado ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body) });
 }
 

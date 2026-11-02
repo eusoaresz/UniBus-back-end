@@ -10,7 +10,7 @@ import { adapterMemoria } from "./helpers/postgres-memoria";
 
 async function catalogoApi(method: string, path: string, body?: unknown, ator: string | null = operadorId) {
   const res = await fetch(base.replace(/\/operacao$/, "") + path, { method,
-    headers: { "Content-Type": "application/json", ...(ator ? { Authorization: `Bearer ${jwt.sign({ id: ator }, process.env.JWT_SECRET!)}` } : {}) },
+    headers: { "Content-Type": "application/json", ...(ator ? { Authorization: `Bearer ${jwt.sign({ id: ator }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, body: await res.json() as any };
 }

@@ -24,7 +24,7 @@ let job: typeof import("../src/modules/notificacoes/notificacoes.job");
 let contador = 0;
 async function api(method: string, path: string, id: string | null = aluno, body?: unknown) {
   const res = await fetch(base + path, { method, headers: { "Content-Type": "application/json",
-    ...(id ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!)}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+    ...(id ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, body: await res.json() as any };
 }
 async function registrar(tema: Parameters<typeof import("../src/modules/notificacoes/notificacoes.service").registrarNotificacao>[1]["tema"], usuarioId = aluno, chave = `teste:${++contador}`) {

@@ -179,6 +179,7 @@ model Usuario {
   status                  StatusConta   @default(AGUARDANDO_ATIVACAO)
   bloqueioDisciplinarAte   DateTime? @db.Timestamptz(3)
   emailVerificadoEm       DateTime?     @db.Timestamptz(3)
+  tokensRevogadosAte      DateTime?     @db.Timestamptz(3)
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -189,6 +190,7 @@ model Usuario {
   usuariosCadastrados Usuario[] @relation("CadastroUsuario")
 
   tokensAcesso TokenAcesso[]
+  tokensRevogados TokenRevogado[]
 
   estudante Estudante?
   preferencias Preferencias?
@@ -262,6 +264,16 @@ model TokenAcesso {
   usuarioId String  @db.Uuid
   usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
 
+  @@index([usuarioId])
+}
+
+model TokenRevogado {
+  tokenHash String @id @db.VarChar(64)
+  usuarioId String @db.Uuid
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  expiraEm DateTime @db.Timestamptz(3)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([expiraEm])
   @@index([usuarioId])
 }
 

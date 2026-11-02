@@ -33,6 +33,9 @@ function substituirMetodo(nome: "findUnique" | "findFirst" | "findMany" | "creat
 
 before(async () => {
   prisma = (await import("../lib/prisma")).prisma;
+  const revogadoOriginal = prisma.tokenRevogado.findUnique;
+  Object.assign(prisma.tokenRevogado, { findUnique: async () => null });
+  restaurar.push(() => { prisma.tokenRevogado.findUnique = revogadoOriginal; });
   const txOriginal = prisma.$transaction;
   const auditoriaOriginal = prisma.alteracaoPerfil.create;
   Object.assign(prisma, { $transaction: async (fn: any) => fn(prisma) });
