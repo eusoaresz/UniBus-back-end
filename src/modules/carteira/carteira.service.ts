@@ -4,6 +4,7 @@ import { prisma } from "../../../lib/prisma";
 import { HttpError } from "../../shared/errors/http-error";
 import { executarTransacao, lancar, estornar } from "./carteira.financeiro";
 import * as schemas from "./carteira.schemas";
+import { registrarNotificacao } from "../notificacoes/notificacoes.service";
 
 const pessoa = { select: { id: true, nome: true } } as const;
 const recargaInclude = {
@@ -84,7 +85,7 @@ export function solicitarRecarga(carteiraId: string, usuarioId: string, dados: z
 
 async function avisar(tx: Prisma.TransactionClient, carteiraId: string, chave: string, mensagem: string) {
   const carteira = await tx.carteira.findUniqueOrThrow({ where: { id: carteiraId }, select: { estudante: { select: { usuarioId: true } } } });
-  await tx.notificacao.create({ data: { usuarioId: carteira.estudante.usuarioId, tipo: "RECARGA", titulo: "Atualização da recarga", mensagem, chaveDeduplicacao: chave } });
+  await registrarNotificacao(tx, { usuarioId: carteira.estudante.usuarioId, tipo: "RECARGA", tema: "CARTEIRA", titulo: "Atualização da recarga", mensagem, chaveDeduplicacao: chave });
 }
 
 export function analisarRecarga(id: string, operadorId: string, aprovada: boolean, dados: z.infer<typeof schemas.rejeitarSchema>) {

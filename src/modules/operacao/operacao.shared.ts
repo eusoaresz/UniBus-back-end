@@ -2,6 +2,7 @@ import { Prisma } from "../../../generated/prisma";
 import { prisma } from "../../../lib/prisma";
 import { executarTransacao, estornar } from "../carteira/carteira.financeiro";
 import { HttpError } from "../../shared/errors/http-error";
+import { registrarNotificacao, temaOperacional } from "../notificacoes/notificacoes.service";
 
 export type Tx = Prisma.TransactionClient;
 export type Ator = { id: string; perfil: string };
@@ -16,9 +17,7 @@ export function exigir(condicao: unknown, mensagem: string, status = 409): asser
   if (!condicao) throw new HttpError(status, mensagem);
 }
 export async function notificar(tx: Tx, usuarioId: string, chave: string, titulo: string, mensagem: string) {
-  return tx.notificacao.upsert({ where: { chaveDeduplicacao: chave }, update: {}, create: {
-    usuarioId, chaveDeduplicacao: chave, tipo: "OPERACAO", titulo, mensagem,
-  } });
+  return registrarNotificacao(tx, { usuarioId, chaveDeduplicacao: chave, tipo: "OPERACAO", tema: temaOperacional(chave), titulo, mensagem });
 }
 export async function notificarOperadores(tx: Tx, chave: string, titulo: string, mensagem: string) {
   for (const op of await tx.usuario.findMany({ where: { perfil: "OPERADOR", status: "ATIVA" }, select: { id: true } })) {

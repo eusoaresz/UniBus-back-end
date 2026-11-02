@@ -65,7 +65,7 @@ after(async () => {
 });
 
 async function api(method: string, path: string, usuarioId: string | null = aluno.usuarioId, body?: unknown) {
-  const res = await fetch(`${base}${path}`, { method, headers: { "Content-Type": "application/json", ...(usuarioId ? { Authorization: `Bearer ${jwt.sign({ id: usuarioId }, process.env.JWT_SECRET!)}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await fetch(`${base}${path}`, { method, headers: { "Content-Type": "application/json", ...(usuarioId ? { Authorization: `Bearer ${jwt.sign({ id: usuarioId }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, body: await res.json() as any };
 }
 async function pix(valor = "10.00", chave = randomUUID()) {
@@ -285,7 +285,7 @@ test("comprovante aceita arquivo válido, mantém propriedade e recusa formato f
     const form = new FormData();
     form.append("arquivo", new Blob([new Uint8Array(conteudo)], { type: "image/png" }), "matricula.png");
     if (extra) form.append("estudanteId", aluno.id);
-    const res = await fetch(`${base}/estudantes/me/comprovantes`, { method: "POST", headers: { Authorization: `Bearer ${jwt.sign({ id: usuarioId }, process.env.JWT_SECRET!)}` }, body: form });
+    const res = await fetch(`${base}/estudantes/me/comprovantes`, { method: "POST", headers: { Authorization: `Bearer ${jwt.sign({ id: usuarioId }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` }, body: form });
     return { status: res.status, body: await res.json() as any };
   };
   assert.equal((await enviar(png, motorista)).status, 403);

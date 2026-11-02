@@ -24,7 +24,7 @@ const cnh = { numeroCnh: "12345678901", categoriaCnh: "D", validadeCnh: "2035-12
 const cadastro = { nome: "Motorista de teste", cpf: "52998224725", email: "motorista@example.com", telefone: "53999999999", senha: "SenhaForte123!", ...cnh };
 async function api(method: string, path: string, body?: unknown, id: string | null = op) {
   const res = await fetch(base + path, { method, headers: { "Content-Type": "application/json",
-    ...(id ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!)}` } : {}) },
+    ...(id ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` } : {}) },
   body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, body: await res.json() as any };
 }

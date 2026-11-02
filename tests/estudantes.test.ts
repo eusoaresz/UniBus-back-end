@@ -48,6 +48,7 @@ before(async () => {
     const original = alvo[campo]; alvo[campo] = valor;
     restaurar.push(() => { alvo[campo] = original; });
   }
+  substituir(prisma.tokenRevogado, "findUnique", async () => null);
   substituir(prisma.usuario, "findUnique", async (args: any) => {
     if (args.where.id === operadorId) return { id: operadorId, perfil, status: "ATIVA", email: "auth@example.com" };
     return { id: usuarioId, perfil: "ESTUDANTE", estudante: jaCadastrado ? { id: estudanteId } : null };
@@ -131,7 +132,7 @@ after(async () => {
 function request(method: string, path = "", body?: unknown, token = true) {
   return fetch(base + path, { method, headers: {
     ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-    ...(token ? { Authorization: `Bearer ${jwt.sign({ id: operadorId }, process.env.JWT_SECRET!)}` } : {}),
+    ...(token ? { Authorization: `Bearer ${jwt.sign({ id: operadorId }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` } : {}),
   }, body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body) });
 }
 function upload(conteudo = Buffer.from("%PDF-1.7\nconteudo de teste\n%%EOF"), tipo = "application/pdf") {

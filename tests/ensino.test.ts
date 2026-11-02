@@ -24,7 +24,7 @@ let unidade: string;
 let ponto: string;
 async function api(method: string, path: string, body?: unknown, id: string | null = op) {
   const res = await fetch(base + path, { method, headers: { "Content-Type": "application/json",
-    ...(id ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!)}` } : {}) },
+    ...(id ? { Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` } : {}) },
   body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, body: await res.json() as any };
 }

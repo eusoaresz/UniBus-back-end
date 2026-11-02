@@ -26,7 +26,7 @@ let aluno: string;
 let cidade: string;
 let unidade: string;
 let estudante: string;
-const auth = (id: string) => ({ Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!)}` });
+const auth = (id: string) => ({ Authorization: `Bearer ${jwt.sign({ id }, process.env.JWT_SECRET!, { expiresIn: "1h" })}` });
 async function api(method: string, path: string, id = op, body?: unknown) {
   const res = await fetch(base + path, { method, headers: { ...auth(id), "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, body: await res.json() as any };
