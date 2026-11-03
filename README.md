@@ -56,4 +56,6 @@ A gestão de veículos usa /api/v1/veiculos, restrita a operadores. Consulte [ca
 
 Os cadastros de instituições, unidades e pontos usam /api/v1/instituicoes, /api/v1/unidades-ensino e /api/v1/pontos-parada. Consulte [cadastros de ensino](docs/ensino.md) para vínculos, histórico e desativação.
 
+O painel web do operador fica no projeto irmão `operador-front-end`, em Next.js, na porta 3001. Com este back-end iniciado na porta 3000, execute `npm ci` e `npm run dev` na pasta do front-end e entre com um operador ativo existente. As chamadas são encaminhadas por proxy local para `/api/v1`, sem precisar abrir CORS. As escalas semanais são administradas em `/api/v1/escalas`; consulte [o contrato de escalas](docs/escalas.md). Nenhuma migração adicional é necessária para o painel.
+
 Rotas e cidades são administradas em /api/v1/rotas e /api/v1/cidades. Consulte [catálogos](docs/catalogos.md) para a revisão obrigatória de rascunhos e a preservação de vínculos após desativação.

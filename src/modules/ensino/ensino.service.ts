@@ -20,7 +20,9 @@ function transacao<T>(operadorId: string, fn: (tx: Tx) => Promise<T>) {
 }
 async function obter(tx: Pick<Tx, "instituicaoEnsino" | "unidadeEnsino" | "pontoParada">, tipo: CadastroEnsino, id: string) {
   const registro = tipo === "instituicoes" ? await tx.instituicaoEnsino.findUnique({ where: { id } })
-    : tipo === "unidades" ? await tx.unidadeEnsino.findUnique({ where: { id } }) : await tx.pontoParada.findUnique({ where: { id } });
+    : tipo === "unidades" ? await tx.unidadeEnsino.findUnique({ where: { id }, include: {
+      instituicaoEnsino: { select: { id: true, nome: true } }, pontoParada: { select: { id: true, nome: true, cidade: true } },
+    } }) : await tx.pontoParada.findUnique({ where: { id }, include: { unidadeEnsino: { select: { id: true } } } });
   if (!registro) throw new HttpError(404, "Cadastro não encontrado");
   return registro;
 }
@@ -54,8 +56,10 @@ export async function listar(tipo: CadastroEnsino, query: unknown) {
     orderBy: [{ criadoEm: "desc" as const }, { id: "desc" as const }] };
   const busca = nome ? { contains: nome, mode: "insensitive" as const } : undefined;
   const registros = tipo === "instituicoes" ? await prisma.instituicaoEnsino.findMany({ ...opcoes, where: { nome: busca, ativa: ativo } })
-    : tipo === "unidades" ? await prisma.unidadeEnsino.findMany({ ...opcoes, where: { nome: busca, ativa: ativo } })
-    : await prisma.pontoParada.findMany({ ...opcoes, where: { nome: busca, ativo } });
+    : tipo === "unidades" ? await prisma.unidadeEnsino.findMany({ ...opcoes, where: { nome: busca, ativa: ativo }, include: {
+      instituicaoEnsino: { select: { id: true, nome: true } }, pontoParada: { select: { id: true, nome: true, cidade: true } },
+    } })
+    : await prisma.pontoParada.findMany({ ...opcoes, where: { nome: busca, ativo }, include: { unidadeEnsino: { select: { id: true } } } });
   return { dados: registros.slice(0, limite), meta: { pagina, limite, temProxima: registros.length > limite } };
 }
 export function editar(tipo: CadastroEnsino, id: string, corpo: unknown, operadorId: string) {

@@ -20,6 +20,10 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     res.status(404).json({ erro: "Usuário não encontrado" });
     return;
   }
+  if (code === "P2003") {
+    res.status(409).json({ erro: "Registro vinculado a outros dados ou vínculo informado indisponível" });
+    return;
+  }
   if (error?.type === "entity.parse.failed") {
     res.status(400).json({ erro: "JSON inválido" });
     return;
