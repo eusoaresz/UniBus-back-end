@@ -13,6 +13,7 @@ import veiculosRouter from "./modules/veiculos/veiculos.routes";
 import { ensinoRouter } from "./modules/ensino/ensino.routes";
 import { catalogosRouter } from "./modules/catalogos/catalogos.routes";
 import notificacoesRouter from "./modules/notificacoes/notificacoes.routes";
+import escalasRouter from "./modules/escalas/escalas.routes";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use((_req, res, next) => {
 });
 app.use(express.json({ limit: "32kb" }));
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/escalas", escalasRouter);
 app.use("/api/v1/notificacoes", notificacoesRouter);
 app.use("/api/v1/usuarios", usuariosRouter);
 app.use("/api/v1/viagens", viagensRouter);
