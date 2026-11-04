@@ -20,6 +20,9 @@ export const prisma =
     adapter,
     // Logs de consultas/erros podem carregar documentos e parâmetros pessoais.
     log: [],
+    // Confirmar presença faz ~25 consultas numa transação Serializable. Com a API no Render (EUA) e o
+    // banco na Neon (São Paulo), cada ida e volta custa ~0,2 s e o limite padrão de 5 s estoura (P2028 → 500).
+    transactionOptions: { maxWait: 10_000, timeout: 20_000 },
   });
 
 if (process.env.NODE_ENV !== "production") {
