@@ -120,6 +120,19 @@ test("foto privada: operador envia, aluno consulta, metadados removidos e exclus
   assert.equal(readdirSync(diretorio).length, 0);
   assert.equal((await fetch(`${base}/usuarios/me/foto`, { headers: auth(aluno) })).status, 404);
 });
+test("usuario troca e remove a propria foto sem acessar a de outros", async () => {
+  const png = await sharp({ create: { width: 40, height: 40, channels: 3, background: "blue" } }).png().toBuffer();
+  const form = new FormData();
+  form.set("foto", new Blob([new Uint8Array(png)], { type: "image/png" }), "foto.png");
+  const envio = await fetch(`${base}/usuarios/me/foto`, { method: "PUT", headers: auth(aluno), body: form });
+  assert.equal(envio.status, 200, await envio.text());
+  assert.equal((await fetch(`${base}/usuarios/me/foto`, { headers: auth(aluno) })).status, 200);
+  assert.equal(await prisma.alteracaoPerfil.count({ where: { usuarioId: aluno, realizadaPorId: aluno } }), 1);
+  assert.equal((await upload(aluno, png, op)).status, 403);
+  assert.equal((await api("DELETE", "/usuarios/me/foto", aluno)).status, 200);
+  assert.equal((await fetch(`${base}/usuarios/me/foto`, { headers: auth(aluno) })).status, 404);
+  assert.equal(readdirSync(diretorio).length, 0);
+});
 test("upload rejeita conteúdo falso e tamanho excessivo e limpa arquivo em falha", async () => {
   assert.equal((await upload(op, Buffer.from("arquivo falso"))).status, 415);
   assert.equal((await upload(op, Buffer.alloc(5 * 1024 * 1024 + 1))).status, 413);
