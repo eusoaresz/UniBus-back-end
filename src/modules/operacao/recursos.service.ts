@@ -75,8 +75,9 @@ export async function alocarTx(tx: Tx, id: string, dados: z.infer<typeof alocaca
 
 export const alocar = (id: string, dados: z.infer<typeof alocacaoSchema>, atorId: string) => transacao((tx) => alocarTx(tx, id, dados, atorId));
 
-export function publicar(id: string, atorId: string) {
-  return transacao(async (tx) => {
+export const publicar = (id: string, atorId: string) => transacao((tx) => publicarTx(tx, id, atorId));
+
+export async function publicarTx(tx: Tx, id: string, atorId: string) {
     const viagem = await tx.viagem.findUnique({ where: { id }, include: { trechos: true, rota: { include: { paradas: { include: { pontoParada: true } } } } } });
     exigir(viagem, "Viagem não encontrada", 404);
     if (viagem.status === "PROGRAMADA") return viagem;
@@ -95,5 +96,4 @@ export function publicar(id: string, atorId: string) {
         dadosAnteriores: { status: t.status }, dadosNovos: { status: "ABERTO" } } });
     }
     return tx.viagem.update({ where: { id }, data: { status: "PROGRAMADA" } });
-  });
 }

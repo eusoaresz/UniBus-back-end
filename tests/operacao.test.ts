@@ -776,3 +776,33 @@ test("fluxo HTTP completo do operador integra cadastros, Pix, viagem, embarque e
   assert.equal((await ok("GET", "/estudantes/me", undefined, a.usuario.id)).statusCadastro, "APROVADO");
   assert.equal((await ok("GET", "/carteira", undefined, a.usuario.id)).saldo, "8.00");
 });
+
+test("escalas geram e publicam as viagens dos proximos dias sem repetir nem travar nas que falham", async () => {
+  const { gerarViagensDasEscalas } = await import("../src/modules/operacao/geracao.service");
+  const rota = await prisma.rota.create({ data: { nome: `Rota escala ${++contador}`, paradas: { create: pontos.map((pontoParadaId, i) => ({ pontoParadaId, ordem: i + 1 })) } } });
+  const m = await motorista(), v = await veiculo(40);
+  const vencido = await motorista();
+  await prisma.motorista.update({ where: { id: vencido.id }, data: { validadeCnh: new Date("2026-12-31") } });
+  const horarios = { saidaIdaMinuto: 360, saidaVoltaMinuto: 720, chegadaPedroMinuto: 780 };
+  const segunda = await prisma.escalaSemanal.create({ data: { diaSemana: "SEGUNDA", turno: "MANHA", rotaId: rota.id, motoristaId: m.id, veiculoId: v.id, ...horarios } });
+  await prisma.escalaSemanal.create({ data: { diaSemana: "SEXTA", turno: "MANHA", rotaId: rota.id, motoristaId: vencido.id, veiculoId: v.id, ...horarios } });
+  // Os testes deste arquivo fixam "agora" em domingo, 10/01/2027 (09:00 em Pedro Osório).
+
+  const primeira = await gerarViagensDasEscalas();
+  assert.equal(primeira.criadas, 5); // segundas de 11/01 a 08/02
+  assert.equal(primeira.falhas.length, 4); // sextas de 15/01 a 05/02, com CNH vencida
+  assert.match(primeira.falhas[0], /CNH vencida/);
+  const viagens = await prisma.viagem.findMany({ where: { rotaId: rota.id }, include: { trechos: { orderBy: { saidaPrevistaEm: "asc" } } }, orderBy: { data: "asc" } });
+  assert.equal(viagens.length, 5); // falhas não deixam rascunho para trás
+  assert.ok(viagens.every((viagem) => viagem.status === "PROGRAMADA" && viagem.escalaSemanalId === segunda.id));
+  const [ida, volta] = viagens[0].trechos;
+  assert.equal(ida.status, "ABERTO"); assert.equal(volta.status, "ABERTO");
+  assert.equal(ida.motoristaId, m.id); assert.equal(ida.capacidade, 40);
+  assert.equal(ida.saidaPrevistaEm.toISOString(), "2027-01-11T09:00:00.000Z");
+  assert.equal(ida.chegadaPrevistaEm.toISOString(), "2027-01-11T10:00:00.000Z");
+  assert.equal(volta.saidaPrevistaEm.toISOString(), "2027-01-11T15:00:00.000Z");
+
+  await prisma.viagem.update({ where: { id: viagens[0].id }, data: { status: "CANCELADA" } });
+  assert.equal((await gerarViagensDasEscalas()).criadas, 0);
+  assert.equal(await prisma.viagem.count({ where: { rotaId: rota.id } }), 5);
+});
