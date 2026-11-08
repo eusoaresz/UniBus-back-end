@@ -50,7 +50,7 @@ export async function consultarRota(tx: Prisma.TransactionClient, id: string) {
   return { nome: rota.nome, pontos };
 }
 
-function dadosTrechos(dados: DadosRascunho, pontos: Awaited<ReturnType<typeof consultarRota>>["pontos"]) {
+export function dadosTrechos(dados: DadosRascunho, pontos: Awaited<ReturnType<typeof consultarRota>>["pontos"]) {
   return dados.trechos.map((trecho) => {
     const saida = new Date(trecho.saidaPrevistaEm);
     const limite = new Date(saida.getTime() - 60 * 60 * 1000);
