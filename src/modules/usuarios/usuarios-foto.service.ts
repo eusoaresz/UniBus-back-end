@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { fileTypeFromBuffer } from "file-type";
+import type { Prisma } from "../../../generated/prisma";
 import { prisma } from "../../../lib/prisma";
 import { fotosStorage } from "../../shared/storage/fotos.storage";
 import { HttpError } from "../../shared/errors/http-error";
@@ -26,11 +27,14 @@ async function limparFoto(chave: string | null) {
   try { await fotosStorage.remover(chave); } catch { console.error("Falha ao remover arquivo de foto sem referência"); }
 }
 
-export async function alterarFoto(id: string, operadorId: string, motivo: string, conteudo: Buffer | null) {
+type Executar = <T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
+
+export async function alterarFoto(id: string, operadorId: string, motivo: string, conteudo: Buffer | null,
+  executar: Executar = (fn) => transacaoPerfil(operadorId, fn)) {
   const chave = conteudo ? await fotosStorage.salvar(await normalizarFoto(conteudo)) : null;
   let anterior: string | null;
   try {
-    anterior = await transacaoPerfil(operadorId, async (tx) => {
+    anterior = await executar(async (tx) => {
       const usuario = await tx.usuario.findUnique({ where: { id }, select: { fotoChave: true } });
       if (!usuario) throw new HttpError(404, "Usuário não encontrado");
       await tx.usuario.update({ where: { id }, data: { fotoChave: chave } });
@@ -44,6 +48,11 @@ export async function alterarFoto(id: string, operadorId: string, motivo: string
   if (anterior !== chave) await limparFoto(anterior);
   return { fotoUrl: chave ? `/api/v1/usuarios/${id}/foto` : null };
 }
+
+// O próprio usuário troca ou remove a sua foto, sem a exigência de operador da alteração administrativa.
+export const alterarPropriaFoto = (usuarioId: string, conteudo: Buffer | null) =>
+  alterarFoto(usuarioId, usuarioId, conteudo ? "Foto alterada pelo próprio usuário" : "Foto removida pelo próprio usuário",
+    conteudo, (fn) => prisma.$transaction(fn));
 
 export async function consultarFoto(id: string, solicitanteId: string, perfil: string) {
   if (id !== solicitanteId && perfil !== "OPERADOR") throw new HttpError(403, "Sem permissão para consultar esta foto");

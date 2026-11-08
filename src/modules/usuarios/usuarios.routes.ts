@@ -9,6 +9,8 @@ router.use(verificarToken);
 router.get("/me", controller.me);
 router.patch("/me", controller.atualizarMe);
 router.get("/me/foto", controller.consultarFoto);
+router.put("/me/foto", limitarTentativas(30), receberFoto, controller.alterarMinhaFoto);
+router.delete("/me/foto", controller.removerMinhaFoto);
 router.get("/:id/foto", controller.consultarFoto);
 router.use(exigirOperador);
 router.patch("/:id/dados", controller.atualizarDados);

@@ -32,6 +32,13 @@ export async function alterarFoto(req: ReqUsuario, res: Response) {
   if (!req.file) throw new HttpError(400, "Envie a foto");
   res.json(await fotos.alterarFoto(id, req.usuarioId!, motivo, req.file.buffer));
 }
+export async function alterarMinhaFoto(req: ReqUsuario, res: Response) {
+  if (!req.file) throw new HttpError(400, "Envie a foto");
+  res.json(await fotos.alterarPropriaFoto(req.usuarioId!, req.file.buffer));
+}
+export async function removerMinhaFoto(req: ReqUsuario, res: Response) {
+  res.json(await fotos.alterarPropriaFoto(req.usuarioId!, null));
+}
 export async function removerFoto(req: ReqUsuario, res: Response) {
   const { motivo } = schemas.motivoPerfilSchema.parse(req.body);
   res.json(await fotos.alterarFoto(schemas.idSchema.parse(req.params.id), req.usuarioId!, motivo, null));
