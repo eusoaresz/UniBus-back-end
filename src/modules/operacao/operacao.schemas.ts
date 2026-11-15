@@ -6,6 +6,12 @@ export const paginaSchema = z.strictObject({
   pagina: z.coerce.number().int().min(1).max(100000).default(1),
   limite: z.coerce.number().int().min(1).max(100).default(20),
 });
+export const listarTrechosSchema = paginaSchema.extend({
+  data: z.iso.date().optional(),
+  turno: z.enum(["MANHA", "TARDE", "NOITE"]).optional(),
+  rotaId: idSchema.optional(),
+  sentido: z.enum(["IDA", "VOLTA"]).optional(),
+});
 export const alocacaoSchema = z.strictObject({
   motoristaId: idSchema, veiculoId: idSchema,
   motoristaExtraId: idSchema.nullable().default(null), veiculoExtraId: idSchema.nullable().default(null),

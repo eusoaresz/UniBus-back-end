@@ -777,6 +777,64 @@ test("fluxo HTTP completo do operador integra cadastros, Pix, viagem, embarque e
   assert.equal((await ok("GET", "/carteira", undefined, a.usuario.id)).saldo, "8.00");
 });
 
+test("consulta de trechos informa suspensao e rota sem expor rascunhos", async () => {
+  const v = await publicar(), a = await aluno(), t = v.trechos[0];
+  await prisma.trechoViagem.update({ where: { id: t.id }, data: { inscricoesSuspensas: true } });
+  await prisma.trechoViagem.update({ where: { id: v.trechos[1].id }, data: { status: "RASCUNHO" } });
+  const resposta = await request("GET", `/trechos?rotaId=${v.rotaId}`, a.usuarioId);
+  assert.equal(resposta.status, 200);
+  const lista = await resposta.json() as any[];
+  assert.ok(Array.isArray(lista));
+  assert.deepEqual(lista.map(item => item.id), [t.id]);
+  assert.equal(lista[0].inscricoesSuspensas, true);
+  assert.equal(lista[0].viagem.rotaId, v.rotaId);
+  const detalhe = await (await request("GET", `/trechos/${t.id}`, a.usuarioId)).json() as any;
+  assert.equal(detalhe.inscricoesSuspensas, lista[0].inscricoesSuspensas);
+  assert.equal(detalhe.viagem.rotaId, lista[0].viagem.rotaId);
+  assert.equal((await request("GET", `/trechos/${v.trechos[1].id}`, a.usuarioId)).status, 404);
+});
+
+test("calendario filtra pelo dia local da saida e combina turno rota sentido e paginacao", async () => {
+  const v = await publicar(), a = await aluno();
+  await prisma.trechoViagem.update({ where: { id: v.trechos[0].id }, data: {
+    saidaPrevistaEm: new Date("2027-01-11T02:59:59Z"), chegadaPrevistaEm: new Date("2027-01-11T03:00:00Z"),
+  } });
+  await prisma.trechoViagem.update({ where: { id: v.trechos[1].id }, data: {
+    saidaPrevistaEm: new Date("2027-01-11T03:00:00Z"), chegadaPrevistaEm: new Date("2027-01-11T04:00:00Z"),
+  } });
+  const listar = async (query: string) => {
+    const resposta = await request("GET", `/trechos?rotaId=${v.rotaId}&${query}`, a.usuarioId);
+    assert.equal(resposta.status, 200);
+    return await resposta.json() as any[];
+  };
+  assert.deepEqual((await listar("data=2027-01-10")).map(t => t.id), [v.trechos[0].id]);
+  assert.deepEqual((await listar("data=2027-01-11&turno=TARDE&sentido=VOLTA")).map(t => t.id), [v.trechos[1].id]);
+  assert.deepEqual(await listar("data=2027-01-11&turno=MANHA"), []);
+  assert.deepEqual(await listar("data=2027-01-11&sentido=IDA"), []);
+  assert.deepEqual((await listar("limite=1&pagina=2")).map(t => t.id), [v.trechos[1].id]);
+  assert.deepEqual(await listar("limite=1&pagina=3"), []);
+  for (const query of ["data=2027-02-30", "turno=INVALIDO", "rotaId=invalido", "sentido=INVALIDO", "limite=101"]) {
+    assert.equal((await request("GET", `/trechos?${query}`, a.usuarioId)).status, 400);
+  }
+});
+
+test("API informa janela de cancelamento tardio somente na participacao propria", async (ctx) => {
+  const v = await publicar(), a = await aluno("-19.00"), b = await aluno(), t = v.trechos[0];
+  const p = await inscricoes.inscrever(t.id, a.usuarioId, entrada(t));
+  ctx.mock.timers.setTime(t.limiteConfirmacaoEm.getTime() + 1000);
+  await prisma.carteira.update({ where: { estudanteId: a.id }, data: { saldo: "10.00" } });
+  await inscricoes.confirmarOperador(t.id, a.id, operadorId, "Confirmacao excepcional para teste");
+  const detalhe = await (await request("GET", `/trechos/${t.id}`, a.usuarioId)).json() as any;
+  assert.equal(detalhe.minhaParticipacao.id, p.id);
+  assert.equal(detalhe.minhaParticipacao.confirmacaoTardia, true);
+  assert.equal(detalhe.minhaParticipacao.limiteEstornoEm, new Date(Date.now() + 30 * 60000).toISOString());
+  const minhas = await (await request("GET", "/participacoes/minhas", a.usuarioId)).json() as any[];
+  assert.equal(minhas.find(item => item.id === p.id).confirmacaoTardia, true);
+  const outro = await (await request("GET", `/trechos/${t.id}`, b.usuarioId)).json() as any;
+  assert.equal(outro.minhaParticipacao, null);
+  assert.equal((await request("POST", `/participacoes/${p.id}/cancelar`, a.usuarioId)).status, 200);
+});
+
 test("escalas geram e publicam as viagens dos proximos dias sem repetir nem travar nas que falham", async () => {
   const { gerarViagensDasEscalas } = await import("../src/modules/operacao/geracao.service");
   const rota = await prisma.rota.create({ data: { nome: `Rota escala ${++contador}`, paradas: { create: pontos.map((pontoParadaId, i) => ({ pontoParadaId, ordem: i + 1 })) } } });
