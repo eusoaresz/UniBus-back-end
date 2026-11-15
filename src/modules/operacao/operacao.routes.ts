@@ -29,12 +29,21 @@ const motorista: RequestHandler = (req: ReqUsuario, _res, next) => {
 };
 
 router.get("/trechos", responder(async (req) => {
-  const { pagina, limite } = s.paginaSchema.parse(req.query);
-  return prisma.trechoViagem.findMany({ where: { status: { not: "RASCUNHO" } },
+  const { pagina, limite, data, turno, rotaId, sentido } = s.listarTrechosSchema.parse(req.query);
+  // O calendário do estudante usa o dia da saída do trecho em Pedro Osório,
+  // inclusive quando a volta acontece no dia seguinte à ida.
+  const inicio = data ? new Date(`${data}T00:00:00-03:00`) : undefined;
+  return prisma.trechoViagem.findMany({ where: {
+    status: { not: "RASCUNHO" },
+    ...(inicio ? { saidaPrevistaEm: { gte: inicio, lt: new Date(inicio.getTime() + 86400000) } } : {}),
+    ...(sentido ? { sentido } : {}),
+    ...(turno || rotaId ? { viagem: { ...(turno ? { turno } : {}), ...(rotaId ? { rotaId } : {}) } } : {}),
+  },
     skip: (pagina - 1) * limite, take: limite, orderBy: [{ saidaPrevistaEm: "asc" }, { id: "asc" }],
     select: { id: true, viagemId: true, sentido: true, status: true, saidaPrevistaEm: true, chegadaPrevistaEm: true,
       limiteConfirmacaoEm: true, limiteCancelamentoEm: true, tarifa: true, capacidade: true, capacidadeExtra: true,
-      viagem: { select: { nomeRota: true, turno: true } },
+      inscricoesSuspensas: true,
+      viagem: { select: { rotaId: true, nomeRota: true, turno: true } },
       paradas: { where: { ativa: true }, orderBy: { ordem: "asc" }, select: { id: true, nome: true, cidade: true, ordem: true } },
       _count: { select: { participacoes: { where: { status: "CONFIRMADA" } } } } },
   });
@@ -52,7 +61,7 @@ router.get("/trechos/:id", responder(async (req) => {
     select: { id: true, viagemId: true, sentido: true, status: true, tarifa: true,
       saidaPrevistaEm: true, chegadaPrevistaEm: true, limiteConfirmacaoEm: true, limiteCancelamentoEm: true,
       capacidade: true, capacidadeExtra: true, inscricoesSuspensas: true,
-      viagem: { select: { nomeRota: true, turno: true } },
+      viagem: { select: { rotaId: true, nomeRota: true, turno: true } },
       motorista: { select: { usuario: { select: { nome: true } } } },
       motoristaExtra: { select: { usuario: { select: { nome: true } } } },
       veiculo: { select: { identificacao: true, placa: true, tipo: true } },

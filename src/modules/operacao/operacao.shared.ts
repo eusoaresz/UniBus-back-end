@@ -11,7 +11,7 @@ export const pessoaSelect = { id: true, nome: true } as const;
 export const participacaoSelect = {
   id: true, estudanteId: true, trechoId: true, origemId: true, destinoId: true,
   status: true, alocacao: true, ordemFila: true, cicloConfirmacao: true,
-  confirmadaEm: true, canceladaEm: true, limiteEstornoEm: true,
+  confirmadaEm: true, canceladaEm: true, limiteEstornoEm: true, confirmacaoTardia: true,
 } as const;
 export function exigir(condicao: unknown, mensagem: string, status = 409): asserts condicao {
   if (!condicao) throw new HttpError(status, mensagem);

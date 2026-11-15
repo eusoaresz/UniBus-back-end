@@ -8,3 +8,16 @@ dist/
 coverage/
 *.log
 .private/
+.agents/
+.claude/
+.cursor/
+.devin/
+.codex/
+.windsurf/
+.aider*
+AGENTS.md
+CLAUDE.md
+SKILL.md
+.cursorrules
+.windsurfrules
+.github/copilot-instructions.md

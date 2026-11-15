@@ -37,6 +37,10 @@ Todas as rotas abaixo usam `/api/v1/operacao`, Bearer token e conta ativa. Objet
 
 Origem e destino são IDs de ParadaTrecho, não de PontoParada. Ambos pertencem ao trecho, com origem antes do destino. Uma vaga é ocupada pelo trecho inteiro. Repetição da mesma inscrição ativa não muda a posição nem cobra novamente; inscrição após cancelamento recebe nova posição e novo ciclo quando confirmada.
 
+`GET /trechos` também aceita filtros opcionais `data=AAAA-MM-DD`, `turno=MANHA|TARDE|NOITE`, `rotaId=uuid` e `sentido=IDA|VOLTA`. Os filtros são combinados antes da paginação. `data` corresponde ao dia da saída de cada trecho em Pedro Osório (UTC-3), e não à data da viagem agrupadora: uma volta após meia-noite aparece no dia seguinte. Sem filtros, mantém a consulta de publicados e histórico em ordem crescente de saída. A resposta continua sendo um array; rascunhos permanecem excluídos.
+
+Lista e detalhe informam `inscricoesSuspensas` e `viagem.rotaId`. Use o ID para comparar preferências de rota, pois `nomeRota` preserva o nome histórico. As respostas de participação incluem `confirmacaoTardia` e `limiteEstornoEm`. Quando a confirmação é tardia, a interface deve considerar essa janela individual para cancelar, em vez de usar apenas `limiteCancelamentoEm` do trecho. A API sempre revalida prazo, status e início real ao executar a ação.
+
 Antes do corte de uma hora, a fila promove elegíveis em ordem. Cadastro deve estar aprovado, usuário ativo, sem impedimento e saldo final de pelo menos -20.00. Sem saldo, mantém posição e recebe aviso, podendo ser ultrapassado por elegíveis. Espera não cobra. Regularização de saldo é reavaliada pelo job antes do corte. Se uma solicitação conjunta de ida e volta não confirmar ambas, tudo é revertido; o usuário pode solicitar os trechos separadamente para entrar em espera.
 
 Cancelamento ordinário até uma hora antes da saída estorna a confirmação. Desistência de espera é permitida depois do corte, sem efeito financeiro. Após início não há promoção nem cancelamento comum. Ao iniciar ou atingir a saída prevista, esperas restantes expiram sem cobrança.

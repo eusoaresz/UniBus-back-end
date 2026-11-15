@@ -2,6 +2,8 @@
 
 API em desenvolvimento para gestão de transporte de estudantes, construída com Node.js, TypeScript, Express, PostgreSQL e Prisma.
 
+Consulte o [alinhamento entre front e backend](docs/alinhamento-front-back.md) para os contratos conferidos em 15/11/2026 e os ajustes a repassar à equipe de interface.
+
 O módulo de usuários implementa cadastro por operador, listagem restrita, login e recuperação de senha. O módulo de viagens implementa criação, consulta e edição de rascunhos por operador. Consulte [o contrato de viagens e a preparação da migração](docs/viagens.md) e [a arquitetura e as pendências](docs/arquitetura.md).
 
 A carteira manual implementa saldo, extrato, recargas Pix e dinheiro, análise pelo operador, estorno integral e serviço interno de débito. Veja [o contrato da carteira](docs/carteira.md) e [as instruções para abrir a cópia de revisão](ABRIR-PROJETO.md). A integração de confirmação, fila e cobrança está no módulo de operação; consulte docs/operacao.md para contratos e limites de validação.
