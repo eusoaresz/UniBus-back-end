@@ -10,6 +10,7 @@ import * as participacoes from "./participacoes.service";
 import * as execucao from "./execucao.service";
 import * as vans from "./van.service";
 import * as disciplina from "./disciplina.service";
+import * as atendimentoMotorista from "./motorista.service";
 import { exigir, participacaoSelect, transacao } from "./operacao.shared";
 
 const router = Router();
@@ -49,13 +50,9 @@ router.get("/trechos", responder(async (req) => {
   });
 }));
 router.get("/trechos/me", motorista, responder(async (req) => {
-  const p = s.paginaSchema.parse(req.query);
-  return prisma.trechoViagem.findMany({ where: { status: { not: "RASCUNHO" },
-    OR: [{ motorista: { usuarioId: req.usuarioId! } }, { motoristaExtra: { usuarioId: req.usuarioId! } }] },
-    skip: (p.pagina - 1) * p.limite, take: p.limite, orderBy: [{ saidaPrevistaEm: "asc" }, { id: "asc" }],
-    select: { id: true, viagemId: true, sentido: true, status: true, saidaPrevistaEm: true, chegadaPrevistaEm: true,
-      viagem: { select: { nomeRota: true, turno: true } } } });
+  return atendimentoMotorista.meusAtendimentos(req.usuarioId!, s.listarTrechosSchema.parse(req.query));
 }));
+router.get("/trechos/:id/resumo", responder((req) => atendimentoMotorista.resumoAtendimento(id(req), ator(req))));
 router.get("/trechos/:id", responder(async (req) => {
   const trecho = await prisma.trechoViagem.findFirst({ where: { id: id(req), status: { not: "RASCUNHO" } },
     select: { id: true, viagemId: true, sentido: true, status: true, tarifa: true,
