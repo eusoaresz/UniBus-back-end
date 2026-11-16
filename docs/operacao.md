@@ -43,7 +43,7 @@ Lista e detalhe informam `inscricoesSuspensas` e `viagem.rotaId`. Use o ID para 
 
 Antes do corte de uma hora, a fila promove elegíveis em ordem. Cadastro deve estar aprovado, usuário ativo, sem impedimento e saldo final de pelo menos -20.00. Sem saldo, mantém posição e recebe aviso, podendo ser ultrapassado por elegíveis. Espera não cobra. Regularização de saldo é reavaliada pelo job antes do corte. Se uma solicitação conjunta de ida e volta não confirmar ambas, tudo é revertido; o usuário pode solicitar os trechos separadamente para entrar em espera.
 
-Cancelamento ordinário até uma hora antes da saída estorna a confirmação. Desistência de espera é permitida depois do corte, sem efeito financeiro. Após início não há promoção nem cancelamento comum. Ao iniciar ou atingir a saída prevista, esperas restantes expiram sem cobrança.
+Cancelamento ordinário até o prazo do trecho (uma hora antes da saída; duas horas na volta da noite) estorna a confirmação. Desistência de espera é permitida depois do corte, sem efeito financeiro. Após início não há promoção nem cancelamento comum. Ao iniciar ou atingir a saída prevista, esperas restantes expiram sem cobrança.
 
 ### Motorista e embarque
 
@@ -74,7 +74,7 @@ Motorista vê passageiros somente da sua alocação. Embarque exige trecho em an
 | POST | `/trechos/:id/cancelar` | motivo; estorna somente este trecho |
 | POST | `/viagens/:id/cancelar` | motivo; cancela e estorna ambos, se não iniciados |
 | POST | `/trechos/:id/iniciar` | Sem corpo |
-| POST | `/trechos/:id/concluir` | Sem corpo; apura faltas |
+| POST | `/trechos/:id/concluir` | Sem corpo; apura faltas (também feito automaticamente 1 h após a chegada) |
 | POST | `/prazos/processar` | Execução manual do processamento periódico |
 | GET | `/estudantes/:id/disciplina` | Faltas e advertências administrativas |
 | POST | `/faltas/:id/analisar` | `{ "aprovar": true, "motivo": "Justificativa aceita" }` |
@@ -86,7 +86,7 @@ Interrupção após início retorna conflito para análise manual; não presume 
 
 ## Van e processamento automático
 
-O job é iniciado pelo `server.ts` e roda a cada 30 segundos, sem sobreposição dentro do processo. Não inicia transportes automaticamente. Antes do corte, promove fila elegível. Uma hora antes da saída notifica operadores sobre demanda em espera. Operador escolhe o motorista e a van; o candidato recebe uma notificação interna. Prazo padrão de resposta é 20 minutos e nunca ultrapassa a saída; pode ser reduzido pelo operador. Não existe chamada externa de WhatsApp/push nesta entrega.
+O job é iniciado pelo `server.ts` e roda a cada 30 segundos, sem sobreposição dentro do processo. Ele inicia cada trecho aberto ou fechado na saída prevista e conclui o trecho em andamento 1 hora após a chegada prevista, com o primeiro operador ativo como responsável no histórico. Na conclusão automática, as faltas só são apuradas se houver pelo menos um embarque registrado no trecho; sem nenhum registro, conclui sem faltas. O operador continua podendo iniciar e concluir manualmente antes disso. Trechos que não podem avançar (sem semestre, recursos inválidos) ficam como estão e o motivo vai para o log uma vez. Antes do corte, promove fila elegível. Uma hora antes da saída notifica operadores sobre demanda em espera. Operador escolhe o motorista e a van; o candidato recebe uma notificação interna. Prazo padrão de resposta é 20 minutos e nunca ultrapassa a saída; pode ser reduzido pelo operador. Não existe chamada externa de WhatsApp/push nesta entrega.
 
 Aceite valida novamente recursos e capacidade e aloca o extra. Após o corte, o operador ainda precisa confirmar os próximos elegíveis: o aceite do motorista não é uma confirmação acadêmica/financeira. Recusa ou expiração avisa os operadores para avaliar alternativa. Há apenas uma convocação pendente por trecho; o serviço serializa alterações e revalida após conflitos. Sem alternativa, o operador comunica indisponibilidade aos alunos em espera. Na saída eles expiram sem cobrança.
 
