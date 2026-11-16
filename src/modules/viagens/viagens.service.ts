@@ -7,6 +7,11 @@ import { viagemDto, viagemSelect } from "./viagens.dto";
 
 type DadosRascunho = z.infer<typeof criarViagemRascunhoSchema>;
 
+// Confirmação e cancelamento fecham 1 h antes da saída. Na volta da noite, o ônibus começa a rota
+// em Pedro Osório 1 h antes de sair de Pelotas, então o prazo fecha 2 h antes da saída.
+export const limiteConfirmacao = (saida: Date, turno: string, sentido: string) =>
+  new Date(saida.getTime() - (turno === "NOITE" && sentido === "VOLTA" ? 2 : 1) * 3600000);
+
 async function transacao<T>(operacao: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
   for (let tentativa = 0; tentativa < 3; tentativa++) {
     try {
@@ -53,7 +58,7 @@ export async function consultarRota(tx: Prisma.TransactionClient, id: string) {
 export function dadosTrechos(dados: DadosRascunho, pontos: Awaited<ReturnType<typeof consultarRota>>["pontos"]) {
   return dados.trechos.map((trecho) => {
     const saida = new Date(trecho.saidaPrevistaEm);
-    const limite = new Date(saida.getTime() - 60 * 60 * 1000);
+    const limite = limiteConfirmacao(saida, dados.turno, trecho.sentido);
     const ordenados = trecho.sentido === "IDA" ? pontos : [...pontos].reverse();
     return {
       sentido: trecho.sentido,

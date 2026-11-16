@@ -124,7 +124,8 @@ test("cria os dois trechos com prazos e paradas inversas, sem cobrar", async () 
   assert.equal(criacao.data.nomeRota, "Centro");
   const [ida, volta] = criacao.data.trechos.create;
   assert.equal(ida.limiteConfirmacaoEm.toISOString(), "2026-11-02T20:00:00.000Z");
-  assert.equal(volta.limiteCancelamentoEm.toISOString(), "2026-11-03T00:00:00.000Z");
+  // Volta da noite fecha 2 h antes da saída (22:00 → 20:00 em Pedro Osório).
+  assert.equal(volta.limiteCancelamentoEm.toISOString(), "2026-11-02T23:00:00.000Z");
   assert.deepEqual(ida.paradas.create.map((p: any) => p.nome), ["Prefeitura", "Praça", "Instituição"]);
   assert.deepEqual(volta.paradas.create.map((p: any) => p.nome), ["Instituição", "Praça", "Prefeitura"]);
   assert.equal(transacoes, 1);

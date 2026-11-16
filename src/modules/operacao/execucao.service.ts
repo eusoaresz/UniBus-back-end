@@ -6,6 +6,7 @@ import { embarqueSchema, reabrirSchema } from "./operacao.schemas";
 import { transacao, trechoTx, exigir, notificar, cancelarTx, atualizarViagem, semestreTx, type Ator, type Tx } from "./operacao.shared";
 import { avaliarDisciplinaTx } from "./disciplina.service";
 import { validarRecurso, validarAlocacao } from "./recursos.service";
+import { limiteConfirmacao } from "../viagens/viagens.service";
 
 export async function expirarEsperaTx(tx: Tx, trechoId: string) {
   for (const p of await tx.participacaoTrecho.findMany({ where: { trechoId, status: "EM_ESPERA" }, include: { estudante: { select: { usuarioId: true } } } })) {
@@ -34,14 +35,14 @@ export function iniciar(id: string, operadorId: string) {
   });
 }
 
-export function concluir(id: string, operadorId: string) {
+export function concluir(id: string, operadorId: string, apurarFaltas = true) {
   return transacao(async (tx) => {
     const t = await trechoTx(tx, id);
     if (t.status === "CONCLUIDO") return t;
     exigir(t.status === "EM_ANDAMENTO", "Inicie o trecho antes de concluir");
     const semestre = await semestreTx(tx, t.saidaPrevistaEm);
-    const ausentes = await tx.participacaoTrecho.findMany({ where: { trechoId: id, status: "CONFIRMADA",
-      embarques: { none: { status: "REGISTRADO" } } } });
+    const ausentes = apurarFaltas ? await tx.participacaoTrecho.findMany({ where: { trechoId: id, status: "CONFIRMADA",
+      embarques: { none: { status: "REGISTRADO" } } } }) : [];
     for (const p of ausentes) {
       await tx.falta.upsert({ where: { participacaoId: p.id }, update: {}, create: { participacaoId: p.id,
         estudanteId: p.estudanteId, semestreId: semestre.id } });
@@ -49,10 +50,39 @@ export function concluir(id: string, operadorId: string) {
     await tx.trechoViagem.update({ where: { id }, data: { status: "CONCLUIDO", concluidoEm: new Date() } });
     for (const estudanteId of new Set(ausentes.map((p) => p.estudanteId))) await avaliarDisciplinaTx(tx, estudanteId, semestre.id, operadorId);
     await atualizarViagem(tx, t.viagemId);
-    await tx.alteracaoTrecho.create({ data: { trechoId: id, motivo: "Conclusão do trecho e apuração de faltas", realizadaPorId: operadorId,
+    await tx.alteracaoTrecho.create({ data: { trechoId: id, realizadaPorId: operadorId,
+      motivo: apurarFaltas ? "Conclusão do trecho e apuração de faltas" : "Conclusão automática sem embarques registrados; faltas não apuradas",
       dadosAnteriores: { status: t.status }, dadosNovos: { status: "CONCLUIDO", faltas: ausentes.length } } });
     return { trechoId: id, status: "CONCLUIDO", faltas: ausentes.length };
   });
+}
+
+const FOLGA_CONCLUSAO_MS = 60 * 60000;
+
+// Execução sem depender do operador: inicia cada trecho no horário da saída e conclui 1 h após a chegada prevista.
+// O operador ainda pode iniciar ou concluir antes, à mão.
+export async function processarExecucaoAutomatica(agora = new Date()) {
+  const resultado = { iniciados: 0, concluidos: 0, falhas: [] as { trechoId: string; erro: string }[] };
+  const operador = await prisma.usuario.findFirst({ where: { perfil: "OPERADOR", status: "ATIVA" },
+    orderBy: { criadoEm: "asc" }, select: { id: true } });
+  if (!operador) return resultado;
+  const falhar = (trechoId: string, erro: unknown) =>
+    resultado.falhas.push({ trechoId, erro: erro instanceof Error ? erro.message : String(erro) });
+
+  const paraIniciar = await prisma.trechoViagem.findMany({ where: { status: { in: ["ABERTO", "FECHADO"] },
+    iniciadoEm: null, saidaPrevistaEm: { lte: agora } }, select: { id: true } });
+  for (const { id } of paraIniciar) {
+    try { await iniciar(id, operador.id); resultado.iniciados++; } catch (erro) { falhar(id, erro); }
+  }
+
+  const paraConcluir = await prisma.trechoViagem.findMany({ where: { status: "EM_ANDAMENTO",
+    chegadaPrevistaEm: { lte: new Date(agora.getTime() - FOLGA_CONCLUSAO_MS) } }, select: { id: true } });
+  for (const { id } of paraConcluir) {
+    // Sem nenhum embarque registrado no trecho, a falta de registro não prova a ausência de ninguém.
+    const houveEmbarque = await prisma.embarque.count({ where: { status: "REGISTRADO", participacao: { trechoId: id } } }) > 0;
+    try { await concluir(id, operador.id, houveEmbarque); resultado.concluidos++; } catch (erro) { falhar(id, erro); }
+  }
+  return resultado;
 }
 
 async function cancelarTrechoTx(tx: Tx, id: string, operadorId: string, motivo: string) {
@@ -86,7 +116,7 @@ export function alterarHorario(id: string, dados: z.infer<typeof reabrirSchema>,
       const local = ["year", "month", "day"].map((tipo) => partes.find((p) => p.type === tipo)!.value).join("-");
       exigir(local === t.viagem.data.toISOString().slice(0, 10), "Mudança de horário deve preservar a data da viagem");
     }
-    const limite = new Date(saida.getTime() - 3600000);
+    const limite = limiteConfirmacao(saida, t.viagem.turno, t.sentido);
     exigir(saida > new Date(), "Saída deve estar no futuro");
     if (dados.reabrir) exigir(limite > new Date(), "Novo prazo precisa estar no futuro para reabrir");
     const outro = await tx.trechoViagem.findFirst({ where: { viagemId: t.viagemId, id: { not: id } } });
