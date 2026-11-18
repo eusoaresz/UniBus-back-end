@@ -907,7 +907,7 @@ test("resumo separa onibus e extra, ignora espera e cancelados e atualiza embarq
   assert.equal((await prisma.carteira.findUniqueOrThrow({ where: { estudanteId: a.id } })).saldo.toFixed(2), saldoAntes);
 });
 
-test("resumo protege atribuicao atual e inicio e conclusao continuam exclusivos do operador", async () => {
+test("resumo protege atribuicao atual e inicio e conclusao manuais continuam exclusivos do operador", async () => {
   const v = await publicar(), t = v.trechos[0], a = await aluno(), substituto = await motorista();
   assert.equal((await catalogoApi("GET", `/operacao/trechos/${t.id}/resumo`, undefined, null)).status, 401);
   assert.equal((await request("GET", `/trechos/${t.id}/resumo`, a.usuarioId)).status, 403);
@@ -1025,4 +1025,58 @@ test("escalas geram e publicam as viagens dos proximos dias sem repetir nem trav
   await prisma.viagem.update({ where: { id: viagens[0].id }, data: { status: "CANCELADA" } });
   assert.equal((await gerarViagensDasEscalas()).criadas, 0);
   assert.equal(await prisma.viagem.count({ where: { rotaId: rota.id } }), 5);
+});
+
+test("execucao automatica inicia na saida e conclui 1h apos a chegada, apurando faltas so com embarques", async () => {
+  const hora = 3600000;
+  const v = await publicar(180, 2), [ida, volta] = v.trechos, a = await aluno(), b = await aluno();
+  const p = await inscricoes.inscrever(ida.id, a.usuarioId, entrada(ida));
+  const q = await inscricoes.inscrever(volta.id, b.usuarioId, entrada(volta));
+  const status = async (id: string) => (await prisma.trechoViagem.findUniqueOrThrow({ where: { id } })).status;
+  const resumo = async (id: string) => {
+    const resposta = await request("GET", `/trechos/${id}/resumo`, v.motorista.usuarioId);
+    assert.equal(resposta.status, 200);
+    return await resposta.json() as any;
+  };
+
+  await execucao.processarExecucaoAutomatica(new Date(instante + 2 * hora));
+  assert.equal(await status(ida.id), "ABERTO");
+
+  await execucao.processarExecucaoAutomatica(new Date(instante + 3 * hora)); // saída da ida
+  assert.equal(await status(ida.id), "EM_ANDAMENTO");
+  assert.equal(await status(volta.id), "ABERTO");
+  const emAndamento = await resumo(ida.id);
+  assert.equal(emAndamento.status, "EM_ANDAMENTO");
+  assert.equal(emAndamento.confirmacoesEncerradas, true);
+  assert.equal(emAndamento.paradas[1].podeDispensar, true);
+  await execucao.embarcar(ida.id, { participacaoId: p.id }, { id: v.motorista.usuarioId, perfil: "MOTORISTA" });
+
+  await execucao.processarExecucaoAutomatica(new Date(instante + 4.5 * hora)); // chegada + 30 min
+  assert.equal(await status(ida.id), "EM_ANDAMENTO");
+  await execucao.processarExecucaoAutomatica(new Date(instante + 5 * hora)); // chegada + 1 h
+  assert.equal(await status(ida.id), "CONCLUIDO");
+  const concluido = await resumo(ida.id);
+  assert.deepEqual(concluido.totais, { confirmados: 1, embarcados: 1, semEmbarque: 0 });
+  assert.ok(concluido.paradas.every((parada: any) => !parada.podeDispensar));
+  assert.equal((await request("POST", `/trechos/${ida.id}/embarques`, v.motorista.usuarioId, { participacaoId: p.id })).status, 409);
+  const atendimentos = await (await request("GET", `/trechos/me?rotaId=${v.rotaId}`, v.motorista.usuarioId)).json() as any[];
+  const atendimento = atendimentos.find(item => item.id === ida.id);
+  assert.equal(atendimento.status, "CONCLUIDO");
+  assert.ok(atendimento.iniciadoEm && atendimento.concluidoEm);
+  assert.equal(await prisma.falta.count({ where: { participacaoId: p.id } }), 0);
+
+  // Volta: ninguém registrou embarque, então conclui sem lançar falta para quem confirmou.
+  await execucao.processarExecucaoAutomatica(new Date(instante + 8 * hora));
+  assert.equal(await status(volta.id), "CONCLUIDO");
+  assert.equal((await resumo(volta.id)).totais.semEmbarque, 1);
+  assert.equal(await prisma.falta.count({ where: { participacaoId: q.id } }), 0);
+  assert.equal((await prisma.viagem.findUniqueOrThrow({ where: { id: v.id } })).status, "CONCLUIDA");
+});
+
+test("prazo de confirmacao fecha 1h antes, e 2h antes na volta da noite", async () => {
+  const { limiteConfirmacao } = await import("../src/modules/viagens/viagens.service");
+  const saida = new Date("2027-01-11T02:00:00Z"); // 23:00 em Pedro Osório
+  assert.equal(limiteConfirmacao(saida, "NOITE", "VOLTA").toISOString(), "2027-01-11T00:00:00.000Z"); // 21:00
+  assert.equal(limiteConfirmacao(saida, "NOITE", "IDA").toISOString(), "2027-01-11T01:00:00.000Z");
+  assert.equal(limiteConfirmacao(saida, "MANHA", "VOLTA").toISOString(), "2027-01-11T01:00:00.000Z");
 });

@@ -1,6 +1,6 @@
 # Cadastro de motoristas
 
-Para o uso pelo próprio motorista, consultar [atendimentos, resumo por parada e embarques](atendimento-motorista.md). Início e conclusão permanecem com o operador.
+Para o uso pelo próprio motorista, consultar [atendimentos, resumo por parada e embarques](atendimento-motorista.md). Início e conclusão são automáticos, com ações manuais disponíveis somente ao operador.
 
 Base `/api/v1/motoristas`. Todas as rotas exigem autenticação e operador ativo. Não há exclusão física pela API.
 

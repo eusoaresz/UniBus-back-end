@@ -43,7 +43,7 @@ Na edição, enviar o mesmo corpo completo, acrescentando `motivo`, texto entre 
 - São obrigatórios exatamente IDA e VOLTA; chegada posterior à saída e retorno sem sobreposição com a ida. O intervalo de 120 minutos entre viagens diferentes será validado na futura alocação/publicação.
 - A rota deve estar ativa, ter pelo menos três pontos ativos e começar por Prefeitura e Praça, ambas em Pedro Osório. Esses nomes aceitam variação de caixa e acentos. A sequência inversa é copiada para a volta.
 - Rotas e pontos precisam ser provisionados previamente. Ainda não há endpoints para cadastrá-los nesta entrega.
-- O servidor define status RASCUNHO, tarifa de 2.00, prazos de uma hora antes de cada saída, nome da rota e responsável pela criação. Não aceita esses campos no corpo da requisição. Motorista e veículo serão definidos em etapa posterior.
+- O servidor define status RASCUNHO, tarifa de 2.00, prazos de uma hora antes de cada saída (duas horas na volta do turno da noite, porque o ônibus começa a rota em Pedro Osório uma hora antes de sair de Pelotas), nome da rota e responsável pela criação. Não aceita esses campos no corpo da requisição. Motorista e veículo serão definidos em etapa posterior.
 - Uma mesma data, turno e rota não pode gerar duas viagens.
 - A tarifa é devolvida como texto com duas casas (`"2.00"`). A data da viagem é `YYYY-MM-DD`; os horários são instantes ISO em UTC.
 - Dados inválidos retornam 400; falta de autenticação, 401; perfil ou conta sem acesso, 403; viagem ou rota inexistente, 404; conflito de cadastro ou estado, 409.
