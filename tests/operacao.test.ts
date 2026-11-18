@@ -835,6 +835,168 @@ test("API informa janela de cancelamento tardio somente na participacao propria"
   assert.equal((await request("POST", `/participacoes/${p.id}/cancelar`, a.usuarioId)).status, 200);
 });
 
+test("motorista consulta somente seus atendimentos com filtros e veiculo da propria alocacao", async () => {
+  const v = await publicar(180, 1), extra = await motorista(), van = await veiculo(1, "VAN"), outro = await motorista();
+  await recursos.alocar(v.trechos[0].id, { motoristaId: v.motorista.id, veiculoId: v.veiculo.id,
+    motoristaExtraId: extra.id, veiculoExtraId: van.id, motivo: "Reforco de transporte" }, operadorId);
+  const listar = async (usuarioId: string, query = "") => {
+    const resposta = await request("GET", `/trechos/me?rotaId=${v.rotaId}${query}`, usuarioId);
+    assert.equal(resposta.status, 200);
+    return await resposta.json() as any[];
+  };
+  const normal = await listar(v.motorista.usuarioId);
+  assert.equal(normal.length, 2);
+  assert.equal(normal[0].alocacao, "VEICULO");
+  assert.equal(normal[0].veiculo.id, v.veiculo.id);
+  assert.equal(normal[0].viagem.rotaId, v.rotaId);
+  assert.equal("motoristaId" in normal[0], false);
+  assert.equal("veiculoExtra" in normal[0], false);
+  const reforco = await listar(extra.usuarioId);
+  assert.equal(reforco.length, 1);
+  assert.equal(reforco[0].alocacao, "EXTRA");
+  assert.equal(reforco[0].veiculo.id, van.id);
+  assert.deepEqual(await listar(outro.usuarioId), []);
+  assert.equal((await listar(v.motorista.usuarioId, "&data=2027-01-10&turno=TARDE&sentido=IDA")).length, 1);
+  assert.deepEqual(await listar(v.motorista.usuarioId, "&data=2027-01-11"), []);
+  assert.deepEqual(await listar(v.motorista.usuarioId, "&turno=MANHA"), []);
+  assert.equal((await listar(v.motorista.usuarioId, "&limite=1&pagina=2"))[0].id, v.trechos[1].id);
+  const a = await aluno();
+  assert.equal((await request("GET", "/trechos/me", a.usuarioId)).status, 403);
+  assert.equal((await request("GET", "/trechos/me", operadorId)).status, 403);
+  assert.equal((await request("GET", "/trechos/me?data=2027-02-30", v.motorista.usuarioId)).status, 400);
+  await prisma.trechoViagem.update({ where: { id: v.trechos[0].id }, data: { status: "RASCUNHO" } });
+  assert.deepEqual(await listar(extra.usuarioId), []);
+});
+
+test("resumo separa onibus e extra, ignora espera e cancelados e atualiza embarques sem nova cobranca", async () => {
+  const v = await publicar(180, 1), t = v.trechos[0], extra = await motorista(), van = await veiculo(1, "VAN");
+  await recursos.alocar(t.id, { motoristaId: v.motorista.id, veiculoId: v.veiculo.id,
+    motoristaExtraId: extra.id, veiculoExtraId: van.id, motivo: "Reforco de transporte" }, operadorId);
+  const a = await aluno(), b = await aluno(), c = await aluno(), d = await aluno("-19.00");
+  const p = await inscricoes.inscrever(t.id, a.usuarioId, entrada(t));
+  const q = await inscricoes.inscrever(t.id, b.usuarioId, { origemId: t.paradas[1].id, destinoId: t.paradas[2].id });
+  assert.equal((await inscricoes.inscrever(t.id, c.usuarioId, entrada(t))).status, "EM_ESPERA");
+  const cancelada = await inscricoes.inscrever(t.id, d.usuarioId, entrada(t));
+  await inscricoes.cancelarPropria(cancelada.id, d.usuarioId);
+  const resumo = async (usuarioId: string) => {
+    const resposta = await request("GET", `/trechos/${t.id}/resumo`, usuarioId);
+    assert.equal(resposta.status, 200);
+    return await resposta.json() as any;
+  };
+  const normal = await resumo(v.motorista.usuarioId), reforco = await resumo(extra.usuarioId), geral = await resumo(operadorId);
+  assert.deepEqual(normal.totais, { confirmados: 1, embarcados: 0, semEmbarque: 1 });
+  assert.equal(normal.alocacao, "VEICULO");
+  assert.equal(reforco.alocacao, "EXTRA");
+  assert.equal(geral.alocacao, null);
+  assert.equal(geral.totais.confirmados, 2);
+  assert.equal(normal.paradas[0].embarquesPrevistos, 1);
+  assert.equal(normal.paradas[1].semMovimentacao, true);
+  assert.equal(reforco.paradas[1].embarquesPrevistos, 1);
+  assert.equal(reforco.paradas[1].semMovimentacao, false);
+  assert.equal(geral.paradas[2].desembarquesPrevistos, 2);
+  assert.deepEqual(normal.paradas.map((parada: any) => parada.id), t.paradas.map(parada => parada.id));
+  assert.equal(JSON.stringify(geral).includes("estudante"), false);
+  const saldoAntes = (await prisma.carteira.findUniqueOrThrow({ where: { estudanteId: a.id } })).saldo.toFixed(2);
+  await execucao.iniciar(t.id, operadorId);
+  assert.equal((await request("POST", `/trechos/${t.id}/embarques`, v.motorista.usuarioId, { participacaoId: q.id })).status, 403);
+  assert.equal((await request("POST", `/trechos/${t.id}/embarques`, v.motorista.usuarioId, { participacaoId: p.id })).status, 200);
+  assert.equal((await request("POST", `/trechos/${t.id}/embarques`, v.motorista.usuarioId, { participacaoId: p.id })).status, 200);
+  assert.deepEqual((await resumo(v.motorista.usuarioId)).totais, { confirmados: 1, embarcados: 1, semEmbarque: 0 });
+  assert.equal((await resumo(v.motorista.usuarioId)).paradas[0].embarcadosNaOrigem, 1);
+  assert.equal((await resumo(extra.usuarioId)).totais.semEmbarque, 1);
+  assert.equal((await prisma.carteira.findUniqueOrThrow({ where: { estudanteId: a.id } })).saldo.toFixed(2), saldoAntes);
+});
+
+test("resumo protege atribuicao atual e inicio e conclusao manuais continuam exclusivos do operador", async () => {
+  const v = await publicar(), t = v.trechos[0], a = await aluno(), substituto = await motorista();
+  assert.equal((await catalogoApi("GET", `/operacao/trechos/${t.id}/resumo`, undefined, null)).status, 401);
+  assert.equal((await request("GET", `/trechos/${t.id}/resumo`, a.usuarioId)).status, 403);
+  assert.equal((await request("GET", `/trechos/${t.id}/resumo`, substituto.usuarioId)).status, 403);
+  assert.equal((await request("POST", `/trechos/${t.id}/iniciar`, v.motorista.usuarioId)).status, 403);
+  assert.equal((await request("POST", `/trechos/${t.id}/concluir`, v.motorista.usuarioId)).status, 403);
+  assert.equal((await request("GET", "/trechos/invalido/resumo", v.motorista.usuarioId)).status, 400);
+  assert.equal((await request("GET", "/trechos/00000000-0000-4000-8000-000000000001/resumo", operadorId)).status, 404);
+  await recursos.alocar(t.id, { motoristaId: substituto.id, veiculoId: v.veiculo.id,
+    motoristaExtraId: null, veiculoExtraId: null, motivo: "Substituicao do motorista" }, operadorId);
+  assert.equal((await request("GET", `/trechos/${t.id}/resumo`, v.motorista.usuarioId)).status, 403);
+  assert.equal((await request("GET", `/trechos/${t.id}/resumo`, substituto.usuarioId)).status, 200);
+  await prisma.trechoViagem.update({ where: { id: t.id }, data: { status: "RASCUNHO" } });
+  assert.equal((await request("GET", `/trechos/${t.id}/resumo`, substituto.usuarioId)).status, 404);
+});
+
+test("fluxo HTTP da van libera atendimento apos aceite e reflete confirmacao e cancelamento do operador", async (ctx) => {
+  const v = await publicar(180, 1), t = v.trechos[0], extra = await motorista(), van = await veiculo(1, "VAN");
+  const a = await aluno(), b = await aluno();
+  await inscricoes.inscrever(t.id, a.usuarioId, entrada(t));
+  assert.equal((await inscricoes.inscrever(t.id, b.usuarioId, entrada(t))).status, "EM_ESPERA");
+  ctx.mock.timers.setTime(t.limiteConfirmacaoEm.getTime() + 60000);
+  const convocacao = await request("POST", `/trechos/${t.id}/convocacoes`, operadorId, {
+    motoristaId: extra.id, veiculoId: van.id, prazoMinutos: 10,
+  });
+  assert.equal(convocacao.status, 201);
+  const c = await convocacao.json() as any;
+  assert.equal((await request("GET", `/trechos/${t.id}/resumo`, extra.usuarioId)).status, 403);
+  const convites = await (await request("GET", "/convocacoes/minhas", extra.usuarioId)).json() as any[];
+  assert.ok(convites.some(item => item.id === c.id));
+  assert.equal((await request("POST", `/convocacoes/${c.id}/responder`, v.motorista.usuarioId, { aceitar: true })).status, 404);
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    assert.equal((await request("POST", `/convocacoes/${c.id}/responder`, extra.usuarioId, { aceitar: true })).status, 200);
+  }
+  const consultar = async () => {
+    const resposta = await request("GET", `/trechos/${t.id}/resumo`, extra.usuarioId);
+    assert.equal(resposta.status, 200);
+    return await resposta.json() as any;
+  };
+  assert.equal((await consultar()).totais.confirmados, 0);
+  assert.equal((await request("POST", `/trechos/${t.id}/confirmacoes`, operadorId, {
+    estudanteId: b.id, motivo: "Confirmacao apos aceite da van",
+  })).status, 200);
+  assert.equal((await consultar()).totais.confirmados, 1);
+  assert.equal((await request("POST", `/trechos/${t.id}/cancelar`, operadorId, { motivo: "Cancelamento do transporte" })).status, 200);
+  const cancelado = await consultar();
+  assert.equal(cancelado.status, "CANCELADO");
+  assert.deepEqual(cancelado.totais, { confirmados: 0, embarcados: 0, semEmbarque: 0 });
+  assert.ok(cancelado.paradas.every((parada: any) => parada.semMovimentacao));
+  assert.equal((await prisma.carteira.findUniqueOrThrow({ where: { estudanteId: b.id } })).saldo.toFixed(2), "100.00");
+});
+
+test("dispensa apenas parada intermediaria vazia apos corte e nunca trecho encerrado", async (ctx) => {
+  const v = await publicar(), t = v.trechos[0];
+  const consultar = async () => {
+    const resposta = await request("GET", `/trechos/${t.id}/resumo`, v.motorista.usuarioId);
+    assert.equal(resposta.status, 200);
+    return await resposta.json() as any;
+  };
+  ctx.mock.timers.setTime(t.limiteConfirmacaoEm.getTime());
+  assert.equal((await consultar()).confirmacoesEncerradas, false);
+  assert.ok((await consultar()).paradas.every((p: any) => !p.podeDispensar));
+  ctx.mock.timers.setTime(t.limiteConfirmacaoEm.getTime() + 1);
+  const fechado = await consultar();
+  assert.equal(fechado.confirmacoesEncerradas, true);
+  assert.deepEqual(fechado.paradas.map((p: any) => p.podeDispensar), [false, true, false]);
+  const a = await aluno();
+  await prisma.participacaoTrecho.create({ data: { trechoId: t.id, estudanteId: a.id,
+    origemId: t.paradas[1].id, destinoId: t.paradas[2].id, status: "CONFIRMADA", alocacao: "VEICULO" } });
+  assert.equal((await consultar()).paradas[1].podeDispensar, false);
+  for (const status of ["CANCELADO", "CONCLUIDO"] as const) {
+    await prisma.trechoViagem.update({ where: { id: t.id }, data: { status } });
+    assert.ok((await consultar()).paradas.every((p: any) => !p.podeDispensar));
+  }
+});
+
+test("resumo da volta usa paradas ativas na ordem publicada mesmo sem passageiros", async () => {
+  const v = await publicar(), t = v.trechos[1];
+  await prisma.paradaTrecho.create({ data: { trechoId: t.id, pontoParadaId: pontos[0],
+    versao: 2, ativa: false, ordem: 10, nome: "Parada antiga", cidade: "Pelotas" } });
+  const resposta = await request("GET", `/trechos/${t.id}/resumo`, v.motorista.usuarioId);
+  assert.equal(resposta.status, 200);
+  const resumo = await resposta.json() as any;
+  assert.equal(resumo.sentido, "VOLTA");
+  assert.deepEqual(resumo.totais, { confirmados: 0, embarcados: 0, semEmbarque: 0 });
+  assert.deepEqual(resumo.paradas.map((parada: any) => parada.id), t.paradas.map(parada => parada.id));
+  assert.ok(resumo.paradas.every((parada: any) => parada.semMovimentacao));
+});
+
 test("escalas geram e publicam as viagens dos proximos dias sem repetir nem travar nas que falham", async () => {
   const { gerarViagensDasEscalas } = await import("../src/modules/operacao/geracao.service");
   const rota = await prisma.rota.create({ data: { nome: `Rota escala ${++contador}`, paradas: { create: pontos.map((pontoParadaId, i) => ({ pontoParadaId, ordem: i + 1 })) } } });
@@ -871,6 +1033,11 @@ test("execucao automatica inicia na saida e conclui 1h apos a chegada, apurando 
   const p = await inscricoes.inscrever(ida.id, a.usuarioId, entrada(ida));
   const q = await inscricoes.inscrever(volta.id, b.usuarioId, entrada(volta));
   const status = async (id: string) => (await prisma.trechoViagem.findUniqueOrThrow({ where: { id } })).status;
+  const resumo = async (id: string) => {
+    const resposta = await request("GET", `/trechos/${id}/resumo`, v.motorista.usuarioId);
+    assert.equal(resposta.status, 200);
+    return await resposta.json() as any;
+  };
 
   await execucao.processarExecucaoAutomatica(new Date(instante + 2 * hora));
   assert.equal(await status(ida.id), "ABERTO");
@@ -878,17 +1045,30 @@ test("execucao automatica inicia na saida e conclui 1h apos a chegada, apurando 
   await execucao.processarExecucaoAutomatica(new Date(instante + 3 * hora)); // saída da ida
   assert.equal(await status(ida.id), "EM_ANDAMENTO");
   assert.equal(await status(volta.id), "ABERTO");
+  const emAndamento = await resumo(ida.id);
+  assert.equal(emAndamento.status, "EM_ANDAMENTO");
+  assert.equal(emAndamento.confirmacoesEncerradas, true);
+  assert.equal(emAndamento.paradas[1].podeDispensar, true);
   await execucao.embarcar(ida.id, { participacaoId: p.id }, { id: v.motorista.usuarioId, perfil: "MOTORISTA" });
 
   await execucao.processarExecucaoAutomatica(new Date(instante + 4.5 * hora)); // chegada + 30 min
   assert.equal(await status(ida.id), "EM_ANDAMENTO");
   await execucao.processarExecucaoAutomatica(new Date(instante + 5 * hora)); // chegada + 1 h
   assert.equal(await status(ida.id), "CONCLUIDO");
+  const concluido = await resumo(ida.id);
+  assert.deepEqual(concluido.totais, { confirmados: 1, embarcados: 1, semEmbarque: 0 });
+  assert.ok(concluido.paradas.every((parada: any) => !parada.podeDispensar));
+  assert.equal((await request("POST", `/trechos/${ida.id}/embarques`, v.motorista.usuarioId, { participacaoId: p.id })).status, 409);
+  const atendimentos = await (await request("GET", `/trechos/me?rotaId=${v.rotaId}`, v.motorista.usuarioId)).json() as any[];
+  const atendimento = atendimentos.find(item => item.id === ida.id);
+  assert.equal(atendimento.status, "CONCLUIDO");
+  assert.ok(atendimento.iniciadoEm && atendimento.concluidoEm);
   assert.equal(await prisma.falta.count({ where: { participacaoId: p.id } }), 0);
 
   // Volta: ninguém registrou embarque, então conclui sem lançar falta para quem confirmou.
   await execucao.processarExecucaoAutomatica(new Date(instante + 8 * hora));
   assert.equal(await status(volta.id), "CONCLUIDO");
+  assert.equal((await resumo(volta.id)).totais.semEmbarque, 1);
   assert.equal(await prisma.falta.count({ where: { participacaoId: q.id } }), 0);
   assert.equal((await prisma.viagem.findUniqueOrThrow({ where: { id: v.id } })).status, "CONCLUIDA");
 });

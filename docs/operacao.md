@@ -50,6 +50,7 @@ Cancelamento ordinário até o prazo do trecho (uma hora antes da saída; duas h
 | Método | Rota | Uso |
 |---|---|---|
 | GET | `/trechos/me` | Atendimentos do motorista autenticado |
+| GET | `/trechos/:id/resumo` | Totais e paradas da alocação do motorista; operador vê o conjunto |
 | GET | `/convocacoes/minhas` | Convocações do motorista |
 | POST | `/convocacoes/:id/responder` | `{ "aceitar": true }` ou false |
 | GET | `/trechos/:id/passageiros` | Motorista atribuído ou operador |
