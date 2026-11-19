@@ -48,7 +48,7 @@ A correção e o registro de auditoria em `AlteracaoPerfil` pertencem à mesma t
 
 Aceita JPEG/PNG reais até 5 MB e 16 megapixels. O servidor decodifica a imagem e salva JPEG de até 512 × 512, sem os metadados originais. O arquivo fica em armazenamento privado e a consulta usa autenticação, inclusive ao utilizar `fotoUrl`. No front, use fetch autenticado e uma URL de objeto para exibir a imagem. Uma tag de imagem com a URL sozinha não envia o token Bearer.
 
-`FOTOS_DIR` configura a pasta (padrão `.private/fotos`), fora de diretórios públicos. Produção precisa de volume persistente, cópias de segurança e permissões restritas. A remoção do arquivo antigo ocorre após o commit. Falhas de remoção geram log genérico e podem exigir limpeza de arquivos órfãos.
+Os bytes da foto (e dos comprovantes de matrícula) ficam na tabela `ArquivoPrivado`, identificados pela mesma chave opaca guardada em `fotoChave`/`chaveArquivo`. Não ficam em disco porque o servidor no Render apaga o sistema de arquivos a cada reinício ou deploy. A tabela vem da migração `20261116000000_arquivos_privados`, que precisa ser aplicada no banco compartilhado (`npx prisma migrate deploy`) antes do deploy desta versão. A remoção do arquivo antigo ocorre após o commit. Falhas de remoção geram log genérico e podem deixar linhas órfãs na tabela.
 
 ## Cadastro e migração
 

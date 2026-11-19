@@ -5,9 +5,11 @@ export function adapterMemoria(db: PGlite) {
   const info = { provider: "postgres" as const, adapterName: "unibus-test-pglite" };
   const tipos: Record<number, number> = { 16: 5, 20: 1, 21: 0, 23: 0, 26: 0, 700: 2, 701: 3, 1700: 4, 1082: 8, 1083: 9, 1114: 10, 1184: 10, 114: 11, 3802: 11, 2950: 15, 17: 13 };
   function consultas(cliente: Pick<PGlite, "query">): SqlQueryable {
-    async function executar(q: { sql: string; args: unknown[] }) {
+    async function executar(q: { sql: string; args: unknown[]; argTypes?: { scalarType?: string }[] }) {
+      // Como o @prisma/adapter-pg: bytes chegam do Prisma em base64.
+      const args = q.args.map((arg, i) => typeof arg === "string" && q.argTypes?.[i]?.scalarType === "bytes" ? Buffer.from(arg, "base64") : arg);
       try {
-        return await cliente.query<any[]>(q.sql, q.args, { rowMode: "array",
+        return await cliente.query<any[]>(q.sql, args, { rowMode: "array",
           parsers: { 20: (v: string) => v, 1700: (v: string) => v, 1082: (v: string) => v, 1114: (v: string) => v, 1184: (v: string) => v, 114: (v: string) => v, 3802: (v: string) => v },
           serializers: { 114: (v: unknown) => typeof v === "string" ? v : JSON.stringify(v), 3802: (v: unknown) => typeof v === "string" ? v : JSON.stringify(v) },
         });
