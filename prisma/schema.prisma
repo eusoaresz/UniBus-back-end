@@ -992,7 +992,12 @@ model Aviso {
 model DispositivoUsuario {
   id String @id @default(uuid()) @db.Uuid
 
-  expoPushToken String  @unique
+  expoPushToken String? @unique
+  webEndpoint String? @unique
+  webP256dh String?
+  webAuth String?
+  sessaoHash String?
+  expiraEm DateTime? @db.Timestamptz(3)
   plataforma    String
   ativo         Boolean @default(true)
 

@@ -24,7 +24,13 @@ export async function login({ email, senha }: z.infer<typeof loginSchema>) {
 }
 
 export async function logout(usuarioId: string, tokenHash: string, expiraEm: Date) {
-  await prisma.tokenRevogado.createMany({ data: [{ tokenHash, usuarioId, expiraEm }], skipDuplicates: true });
+  await prisma.$transaction(async tx => {
+    await tx.tokenRevogado.createMany({ data: [{ tokenHash, usuarioId, expiraEm }], skipDuplicates: true });
+    await tx.entregaNotificacao.updateMany({ where: { dispositivo: { usuarioId, sessaoHash: tokenHash, plataforma: "WEB" },
+      status: { in: ["PENDENTE", "FALHOU", "PROCESSANDO"] } }, data: { status: "CANCELADA" } });
+    await tx.dispositivoUsuario.updateMany({ where: { usuarioId, sessaoHash: tokenHash, plataforma: "WEB" },
+      data: { ativo: false, sessaoHash: null } });
+  });
 }
 
 export async function recuperarSenha(email: string) {

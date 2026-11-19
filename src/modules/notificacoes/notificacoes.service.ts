@@ -25,9 +25,19 @@ export async function registrarNotificacao(tx: Prisma.TransactionClient, dados: 
   usuarioId: string; chaveDeduplicacao: string; tipo: string; tema: Tema; titulo: string; mensagem: string; avisoId?: string;
 }) {
   const pref = await tx.preferenciasNotificacao.findUnique({ where: { usuarioId: dados.usuarioId }, select: preferenciasSelect }) ?? preferenciasPadrao;
-  return tx.notificacao.upsert({ where: { chaveDeduplicacao: dados.chaveDeduplicacao }, update: {}, create: {
+  const criada = await tx.notificacao.createMany({ skipDuplicates: true, data: [{
     ...dados, alertaHabilitado: pref.ativadas && pref[temas[dados.tema]],
-  } });
+  }] });
+  const notificacao = await tx.notificacao.findUniqueOrThrow({ where: { chaveDeduplicacao: dados.chaveDeduplicacao } });
+  if (criada.count && notificacao.alertaHabilitado) {
+    const dispositivos = await tx.dispositivoUsuario.findMany({ where: { usuarioId: dados.usuarioId, plataforma: "WEB", ativo: true,
+      OR: [{ expiraEm: null }, { expiraEm: { gt: new Date() } }] }, select: { id: true } });
+    if (dispositivos.length) await tx.entregaNotificacao.createMany({ skipDuplicates: true, data: dispositivos.map(d => ({
+      notificacaoId: notificacao.id, dispositivoId: d.id, canal: "PUSH", destino: "WEB",
+      chaveDeduplicacao: `web:${notificacao.id}:${d.id}`,
+    })) });
+  }
+  return notificacao;
 }
 
 export function temaOperacional(chave: string): Tema {
