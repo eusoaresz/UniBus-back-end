@@ -83,7 +83,7 @@ Devoluções/disputas, pagamento após cancelamento local e estouro do limite de
 
 ## Validação e entrega
 
-Na comparação com a `dev` em 22/11/2026 (`d5061a7`, PR #24), foi identificada a mudança de fotos e comprovantes para a tabela `ArquivoPrivado`. Ela deve ser incorporada antes da entrega da carteira, preservando as migrações de arquivos, push e pagamentos. A migração de arquivos cria a tabela, mas não importa os arquivos antigos do disco: confirmar a transferência dos bytes pelas mesmas chaves antes da troca de armazenamento. Fotos antigas sem registro correspondente na tabela retornam 404.
+Na comparação com a `dev` em 22/11/2026 (`d5061a7`, PR #24), foi identificada a mudança de fotos e comprovantes para a tabela `ArquivoPrivado`. Essa atualização foi incorporada à branch `pagamentos`, preservando as migrações de arquivos, push e pagamentos. A migração de arquivos cria a tabela, mas não importa os arquivos antigos do disco: confirmar a transferência dos bytes pelas mesmas chaves antes da troca de armazenamento. Fotos antigas sem registro correspondente na tabela retornam 404.
 
 A combinação da `dev` com push e Pix foi validada em uma cópia local separada, sem alterar o histórico da branch de trabalho. Geração do Prisma e checagem de tipos passaram. A suíte executou 273 testes: 272 passaram e um teste de disciplina falhou por conexão HTTP local interrompida (`ECONNRESET`). A repetição isolada de todo o grupo de operação aprovou os 56 testes, incluindo esse caso. Os testes de Pix, push, armazenamento e preservação de dados nas migrações passaram na suíte completa. Não foi identificada regressão reproduzível nessa combinação; isso não substitui a homologação externa nem confirma o estado do banco publicado.
 

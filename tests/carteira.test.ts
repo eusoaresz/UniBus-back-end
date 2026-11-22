@@ -1,8 +1,6 @@
 import { before, beforeEach, after, test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, mkdtempSync, unlinkSync, rmdirSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { readFileSync, readdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -16,8 +14,6 @@ import { valorSchema } from "../src/modules/carteira/carteira.schemas";
 process.env.JWT_SECRET = "segredo-exclusivo-dos-testes-sem-uso-real";
 process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
 process.env.NODE_ENV = "test";
-const comprovantesDir = mkdtempSync(join(tmpdir(), "unibus-comprovantes-teste-"));
-process.env.COMPROVANTES_DIR = comprovantesDir;
 process.env.MAILTRAP_USER = "test"; process.env.MAILTRAP_PASS = "test"; process.env.SMTP_FROM = "test@example.com";
 const db = new PGlite();
 const prisma = new PrismaClient({ adapter: adapterMemoria(db) });
@@ -60,8 +56,6 @@ beforeEach(async () => { aluno = await criarAluno(); });
 after(async () => {
   if (server) await new Promise<void>((resolve, reject) => server.close((e) => e ? reject(e) : resolve()));
   await prisma.$disconnect(); await db.close();
-  for (const nome of readdirSync(comprovantesDir)) unlinkSync(join(comprovantesDir, nome));
-  rmdirSync(comprovantesDir);
 });
 
 async function api(method: string, path: string, usuarioId: string | null = aluno.usuarioId, body?: unknown) {
@@ -294,7 +288,7 @@ test("comprovante aceita arquivo válido, mantém propriedade e recusa formato f
   assert.equal(valido.body.chaveArquivo, undefined);
   const salvo = await prisma.comprovanteMatricula.findUniqueOrThrow({ where: { id: valido.body.id } });
   assert.equal(salvo.estudanteId, aluno.id);
-  assert.deepEqual(readFileSync(join(comprovantesDir, salvo.chaveArquivo)), png);
+  assert.deepEqual(Buffer.from((await prisma.arquivoPrivado.findUniqueOrThrow({ where: { chave: salvo.chaveArquivo } })).conteudo), png);
   const outro = await criarAluno();
   assert.equal((await api("GET", "/estudantes/me/comprovantes", outro.usuarioId)).body.dados.length, 0);
   assert.equal((await api("GET", "/estudantes/me/comprovantes")).body.dados.length, 1);

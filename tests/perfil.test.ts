@@ -1,8 +1,6 @@
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, mkdtempSync, unlinkSync, rmdirSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { readFileSync, readdirSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import jwt from "jsonwebtoken";
@@ -15,8 +13,6 @@ process.env.JWT_SECRET = "segredo-exclusivo-dos-testes-sem-uso-real";
 process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
 process.env.NODE_ENV = "test";
 process.env.MAILTRAP_USER = "test"; process.env.MAILTRAP_PASS = "test"; process.env.SMTP_FROM = "test@example.com";
-const diretorio = mkdtempSync(join(tmpdir(), "unibus-fotos-teste-"));
-process.env.FOTOS_DIR = diretorio;
 const db = new PGlite();
 const prisma = new PrismaClient({ adapter: adapterMemoria(db) });
 let server: Server;
@@ -48,8 +44,6 @@ before(async () => {
 after(async () => {
   if (server) await new Promise<void>(resolve => server.close(() => resolve()));
   await prisma.$disconnect(); await db.close();
-  for (const nome of readdirSync(diretorio)) unlinkSync(join(diretorio, nome));
-  rmdirSync(diretorio);
 });
 test("somente operador altera dados pessoais, com auditoria e sem alterar carteira ou aprovação", async () => {
   for (const path of [`/usuarios/${aluno}/dados`]) assert.equal((await api("PATCH", path, aluno, { nome: "Outro", motivo: "Correção" })).status, 403);
@@ -117,7 +111,7 @@ test("foto privada: operador envia, aluno consulta, metadados removidos e exclus
   assert.equal((await fetch(`${base}/usuarios/${op}/foto`, { headers: auth(aluno) })).status, 403);
   assert.equal((await api("DELETE", `/usuarios/${aluno}/foto`, aluno, { motivo: "Remover foto" })).status, 403);
   assert.equal((await api("DELETE", `/usuarios/${aluno}/foto`, op, { motivo: "Remover foto" })).status, 200);
-  assert.equal(readdirSync(diretorio).length, 0);
+  assert.equal(await prisma.arquivoPrivado.count(), 0);
   assert.equal((await fetch(`${base}/usuarios/me/foto`, { headers: auth(aluno) })).status, 404);
 });
 test("usuario troca e remove a propria foto sem acessar a de outros", async () => {
@@ -131,14 +125,14 @@ test("usuario troca e remove a propria foto sem acessar a de outros", async () =
   assert.equal((await upload(aluno, png, op)).status, 403);
   assert.equal((await api("DELETE", "/usuarios/me/foto", aluno)).status, 200);
   assert.equal((await fetch(`${base}/usuarios/me/foto`, { headers: auth(aluno) })).status, 404);
-  assert.equal(readdirSync(diretorio).length, 0);
+  assert.equal(await prisma.arquivoPrivado.count(), 0);
 });
 test("upload rejeita conteúdo falso e tamanho excessivo e limpa arquivo em falha", async () => {
   assert.equal((await upload(op, Buffer.from("arquivo falso"))).status, 415);
   assert.equal((await upload(op, Buffer.alloc(5 * 1024 * 1024 + 1))).status, 413);
   const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: "red" } }).png().toBuffer();
   assert.equal((await upload(op, png, "00000000-0000-4000-8000-000000000099")).status, 404);
-  assert.equal(readdirSync(diretorio).length, 0);
+  assert.equal(await prisma.arquivoPrivado.count(), 0);
 });
 
 test("autoedicao permite nome e telefone, rejeita demais dados e preserva carteira", async () => {

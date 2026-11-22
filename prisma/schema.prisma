@@ -342,6 +342,13 @@ model Motorista {
   indisponibilidades IndisponibilidadeMotorista[]
 }
 
+// Bytes de fotos e comprovantes. Ficam no banco porque o disco do servidor (Render) é apagado a cada reinício.
+model ArquivoPrivado {
+  chave    String   @id @db.Uuid
+  conteudo Bytes
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+}
+
 model ComprovanteMatricula {
   id String @id @default(uuid()) @db.Uuid
 
