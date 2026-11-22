@@ -19,7 +19,7 @@ export async function executarTransacao<T>(cliente: Pick<PrismaClient, "$transac
 
 type Lancamento = {
   carteiraId: string; valor: Prisma.Decimal; tipo: "RECARGA" | "COBRANCA_CONFIRMACAO" | "ESTORNO";
-  chaveIdempotencia: string; realizadaPorId: string; recargaId?: string;
+  chaveIdempotencia: string; realizadaPorId: string | null; recargaId?: string;
   participacaoId?: string; cicloConfirmacao?: number; movimentacaoOriginalId?: string; motivo?: string;
 };
 

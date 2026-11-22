@@ -888,6 +888,7 @@ model Recarga {
   analisadaPor   Usuario? @relation(fields: [analisadaPorId], references: [id], onDelete: Restrict)
 
   credito MovimentacaoCarteira?
+  pagamento Pagamento?
 
   solicitadaPorId String?  @db.Uuid
   solicitadaPor   Usuario? @relation("SolicitacaoRecarga", fields: [solicitadaPorId], references: [id], onDelete: Restrict)
@@ -928,13 +929,29 @@ model MovimentacaoCarteira {
 
   estorno MovimentacaoCarteira? @relation("EstornoMovimentacao")
 
-  realizadaPorId String  @db.Uuid
-  realizadaPor   Usuario @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  realizadaPorId String? @db.Uuid
+  realizadaPor   Usuario? @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
 
   @@unique([participacaoId, cicloConfirmacao, tipo])
   @@index([carteiraId, criadoEm])
   @@index([carteiraId])
   @@index([realizadaPorId])
+}
+
+model Pagamento {
+  recargaId String @id @db.Uuid
+  recarga Recarga @relation(fields: [recargaId], references: [id], onDelete: Restrict)
+  provedor String @default("STRIPE")
+  ambiente String
+  referencia String? @unique
+  chaveCriacao String @unique @default(uuid()) @db.Uuid
+  status String @default("CRIANDO")
+  revisaoNecessaria Boolean @default(false)
+  motivoRevisao String?
+  proximaConsultaEm DateTime @default(now()) @db.Timestamptz(3)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+  @@index([status, proximaConsultaEm])
 }
 
 model IndisponibilidadeMotorista {

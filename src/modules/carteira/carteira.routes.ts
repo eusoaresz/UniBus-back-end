@@ -3,6 +3,7 @@ import type { Response } from "express";
 import { verificarToken, exigirOperador, type ReqUsuario } from "../../shared/middlewares/auth";
 import * as s from "./carteira.schemas";
 import * as service from "./carteira.service";
+import * as pix from "./pix";
 
 export const carteiraRouter = Router();
 export const operadorCarteiraRouter = Router();
@@ -15,6 +16,8 @@ carteiraRouter.use(verificarToken, (req: ReqUsuario, res, next) => {
   next();
 });
 carteiraRouter.get("/", responder(propria));
+carteiraRouter.post("/pix", responder(async req => pix.solicitarPix((await propria(req)).id, req.usuarioId!, s.recargaSchema.parse(req.body)), 201));
+carteiraRouter.get("/pix/:id", responder(async req => { await propria(req); return pix.consultarPix(s.idSchema.parse(req.params.id), req.usuarioId!); }));
 carteiraRouter.get("/extrato", responder(async (req) => service.extrato((await propria(req)).id, s.paginaSchema.parse(req.query))));
 carteiraRouter.get("/recargas", responder(async (req) => service.listarRecargas(s.recargasFiltroSchema.parse(req.query), (await propria(req)).id)));
 carteiraRouter.post("/recargas", responder(async (req) => service.solicitarRecarga((await propria(req)).id, req.usuarioId!, s.recargaSchema.parse(req.body)), 201));

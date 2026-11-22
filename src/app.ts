@@ -14,6 +14,7 @@ import { ensinoRouter } from "./modules/ensino/ensino.routes";
 import { catalogosRouter } from "./modules/catalogos/catalogos.routes";
 import notificacoesRouter from "./modules/notificacoes/notificacoes.routes";
 import escalasRouter from "./modules/escalas/escalas.routes";
+import { receberEvento } from "./modules/carteira/pix";
 
 const app = express();
 
@@ -22,6 +23,12 @@ app.use((_req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
   next();
+});
+// A assinatura Stripe exige os bytes originais, antes do parser JSON.
+app.post("/api/v1/pagamentos/stripe", express.raw({ type: "application/json", limit: "256kb" }), async (req, res) => {
+  const assinatura = req.get("stripe-signature");
+  if (!assinatura || !Buffer.isBuffer(req.body)) { res.status(400).json({ erro: "Evento de pagamento inválido" }); return; }
+  res.json(await receberEvento(req.body, assinatura));
 });
 app.use(express.json({ limit: "32kb" }));
 app.use("/api/v1/auth", authRouter);
