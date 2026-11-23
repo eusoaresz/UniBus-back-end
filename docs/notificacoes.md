@@ -23,7 +23,7 @@ Base `/api/v1/notificacoes`, com `Authorization: Bearer {{token}}`. Estudantes, 
 
 `ativadas: false` desativa todos os alertas sem apagar as escolhas individuais. Quando ativadas, cada tema respeita sua própria configuração. Um PATCH vazio, campos extras e valores como `"false"` são rejeitados com 400.
 
-Os eventos continuam registrados quando o alerta está desativado. A configuração não altera saldo, falta, confirmação, cancelamento, aviso ou qualquer regra de negócio. Ao desativar um tema, alertas existentes daquele tema deixam de aparecer e entregas pendentes/com falha são canceladas. Reativar permite novos alertas, sem disparar os eventos antigos. Não há provedor externo nem entregas em processamento nesta implementação.
+Os eventos continuam registrados quando o alerta está desativado. A configuração não altera saldo, falta, confirmação, cancelamento, aviso ou qualquer regra de negócio. Ao desativar um tema, alertas existentes daquele tema deixam de aparecer e entregas pendentes/com falha são canceladas. Reativar permite novos alertas, sem disparar os eventos antigos. O envio externo opcional está descrito em [Web Push e expansão para Expo](web-push.md).
 
 ## Central e histórico
 
@@ -52,7 +52,7 @@ Participações confirmadas recebem um lembrete na janela de 30 minutos antes da
 
 `novidades` está disponível para futuras publicações desse tema; não há fonte de promoções nem rota pública para criar notificações arbitrárias. O código central de registro aceita o tema para integração futura.
 
-Esta entrega fornece alertas internos via API. O front precisa consultá-la para mostrá-los. Push/WhatsApp/e-mail de notificações e silenciamento temporário não fazem parte desta entrega. Um provedor futuro deve revalidar as configurações imediatamente antes do envio e respeitar entregas canceladas.
+Esta API fornece a central de notificações. Web Push acrescenta um aviso genérico no dispositivo, quando habilitado no servidor e autorizado no navegador, sem substituir a central. WhatsApp, e-mail de notificações, envio nativo Expo e silenciamento temporário não fazem parte desta entrega. O envio Web Push revalida as configurações antes de chamar o provedor e respeita entregas canceladas; mensagens já aceitas pelo provedor não podem ser recolhidas.
 
 ## Migração e testes
 

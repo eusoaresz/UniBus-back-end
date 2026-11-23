@@ -1,5 +1,7 @@
 # Carteira manual
 
+Para recargas Pix com confirmação pelo provedor, consulte [pagamentos Stripe](pagamentos.md). As rotas abaixo permanecem como fluxo manual; recargas integradas não podem ser aprovadas, rejeitadas ou estornadas por essas ações manuais.
+
 Implementa saldo, extrato, Pix solicitado pelo estudante, aprovação/rejeição pelo operador, dinheiro registrado pelo operador, estorno integral de recarga e integração com o cadastro unificado de estudantes. A carteira é criada com saldo 0.00 e limite 20.00. A matrícula é única por unidade de ensino.
 
 ## Acesso
@@ -46,7 +48,7 @@ Pedido Pix não credita saldo. A aprovação credita e registra operador/data. D
 
 O operador confere o pagamento no extrato bancário. A lista apresenta nome, matrícula, unidade, valor, horário, solicitante e responsável pela análise; não devolve CPF, senha ou dados bancários. A quantidade pendente ajuda na conferência, mas não detecta duas solicitações diferentes para um mesmo Pix. identificadorPagamento permanece sem uso. Registros antigos podem ter solicitante desconhecido, representado por null.
 
-As notificações são gravadas junto à transação financeira e consultadas no aplicativo. Push, WhatsApp e integração bancária não estão implementados.
+As notificações são gravadas junto à transação financeira e consultadas na central. Há integração opcional de [Web Push](web-push.md) e uma etapa de [pagamentos Stripe](pagamentos.md), com configuração e validação externa pendentes. WhatsApp não está implementado.
 
 ## Serviço financeiro interno
 
@@ -66,4 +68,4 @@ Não executada no Neon. Antes de aplicar no compartilhado, revisar com o colega 
 
 Os testes da carteira usam a API HTTP, Prisma e PostgreSQL em memória via PGlite, com adaptador exclusivo de testes. Cobrem crédito, débito, estorno, rollback, permissões, repetição, matrícula e chamadas simultâneas. PGlite serializa transações em uma conexão: esses testes verificam resultados e comparação de versão, mas não reproduzem todos os conflitos entre múltiplas conexões no PostgreSQL de produção. Validar também com PostgreSQL dedicado antes de disponibilizar operações financeiras reais.
 
-Ainda pendentes: interface do aplicativo, validação financeira em PostgreSQL com múltiplas conexões, push e pagamentos integrados. Operação já implementa confirmação/fila, alocação/publicação e disciplina, com os limites documentados em operacao.md. O ZIP contém o backend; não é uma interface gráfica pronta.
+Ainda pendentes: integração da interface, validação financeira em PostgreSQL com múltiplas conexões e homologação externa de push e pagamentos. Os limites da integração Stripe estão em pagamentos.md. Operação já implementa confirmação/fila, alocação/publicação e disciplina, com os limites documentados em operacao.md.

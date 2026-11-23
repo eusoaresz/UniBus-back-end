@@ -8,6 +8,7 @@ import { registrarNotificacao } from "../notificacoes/notificacoes.service";
 
 const pessoa = { select: { id: true, nome: true } } as const;
 const recargaInclude = {
+  pagamento: { select: { provedor: true, ambiente: true, status: true, revisaoNecessaria: true, motivoRevisao: true } },
   solicitadaPor: pessoa, analisadaPor: pessoa,
   credito: { select: { id: true, estorno: { select: { id: true, criadoEm: true, motivo: true } } } },
   carteira: { select: { estudante: { select: { id: true, matricula: true, unidadeEnsinoId: true, usuario: pessoa } } } },
@@ -90,8 +91,9 @@ async function avisar(tx: Prisma.TransactionClient, carteiraId: string, chave: s
 
 export function analisarRecarga(id: string, operadorId: string, aprovada: boolean, dados: z.infer<typeof schemas.rejeitarSchema>) {
   return executarTransacao(prisma, async (tx) => {
-    const recarga = await tx.recarga.findUnique({ where: { id }, include: { credito: true } });
+    const recarga = await tx.recarga.findUnique({ where: { id }, include: { credito: true, pagamento: true } });
     if (!recarga) throw new HttpError(404, "Recarga não encontrada");
+    if (recarga.pagamento) throw new HttpError(409, "Recarga integrada é confirmada pelo provedor de pagamento");
     const status = aprovada ? "APROVADA" : "REJEITADA";
     const chave = `analise:${operadorId}:${dados.chaveIdempotencia}`;
     const usada = await tx.movimentacaoCarteira.findUnique({ where: { chaveIdempotencia: chave } });
@@ -127,8 +129,9 @@ export function registrarDinheiro(operadorId: string, dados: z.infer<typeof sche
 
 export function estornarRecarga(id: string, operadorId: string, dados: z.infer<typeof schemas.estornarSchema>) {
   return executarTransacao(prisma, async (tx) => {
-    const recarga = await tx.recarga.findUnique({ where: { id }, include: { credito: { include: { estorno: true } } } });
+    const recarga = await tx.recarga.findUnique({ where: { id }, include: { pagamento: true, credito: { include: { estorno: true } } } });
     if (!recarga) throw new HttpError(404, "Recarga não encontrada");
+    if (recarga.pagamento) throw new HttpError(409, "Devolução de pagamento integrado exige conciliação com o provedor");
     if (recarga.status !== "APROVADA" || !recarga.credito) throw new HttpError(409, "Somente recarga aprovada com crédito pode ser estornada");
     const resultado = await estornar(tx, { movimentacaoId: recarga.credito.id, realizadaPorId: operadorId, motivo: dados.motivo, chaveIdempotencia: `estorno:${operadorId}:${dados.chaveIdempotencia}` });
     if (!recarga.credito.estorno) await avisar(tx, recarga.carteiraId, `estorno-recarga:${id}`, `A recarga de R$ ${recarga.valor.toFixed(2)} foi estornada.`);
