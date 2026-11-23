@@ -2,7 +2,17 @@
 
 API em desenvolvimento para gestão de transporte de estudantes, construída com Node.js, TypeScript, Express, PostgreSQL e Prisma.
 
-O módulo de usuários implementa cadastro por operador, listagem restrita, login e recuperação de senha. Os demais domínios existem no schema, mas suas APIs ainda não foram implementadas. Consulte [a arquitetura e as pendências](docs/arquitetura.md).
+Consulte o [alinhamento entre front e backend](docs/alinhamento-front-back.md) para os contratos conferidos em 15/11/2026 e os ajustes a repassar à equipe de interface.
+
+O [contrato do atendimento do motorista](docs/atendimento-motorista.md) descreve suas viagens, resumo por parada, passageiros, embarques e convocações.
+
+As [notificações Web Push](docs/web-push.md) descrevem a configuração do backend, a integração do site e a futura expansão para aplicativo Expo.
+
+A [integração Pix com Stripe](docs/pagamentos.md) acrescenta confirmação automática de recargas, com configuração e homologação externa pendentes.
+
+O módulo de usuários implementa cadastro por operador, listagem restrita, login e recuperação de senha. O módulo de viagens implementa criação, consulta e edição de rascunhos por operador. Consulte [o contrato de viagens e a preparação da migração](docs/viagens.md) e [a arquitetura e as pendências](docs/arquitetura.md).
+
+A carteira manual implementa saldo, extrato, recargas Pix e dinheiro, análise pelo operador, estorno integral e serviço interno de débito. Veja [o contrato da carteira](docs/carteira.md) e [as instruções para abrir a cópia de revisão](ABRIR-PROJETO.md). A integração de confirmação, fila e cobrança está no módulo de operação; consulte docs/operacao.md para contratos e limites de validação.
 
 ## Executar localmente
 
@@ -12,12 +22,16 @@ Requisitos: Node.js 24, npm, PostgreSQL e uma conta de sandbox SMTP no Mailtrap.
 2. Copie `.env.example` para `.env` e preencha os valores locais. Não versione esse arquivo.
 3. Gere um segredo JWT aleatório, por exemplo com `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
 4. Execute `npm run prisma:generate` e `npm run prisma:validate`.
-5. Aponte `DATABASE_URL` para um banco de desenvolvimento e execute `npm run prisma:migrate` para aplicar as migrações.
+5. Aponte `DATABASE_URL` para um banco de desenvolvimento. Antes de executar `npm run prisma:migrate`, revise a preparação de dados em [viagens](docs/viagens.md), principalmente se houver viagens existentes. Coordene migrações em banco compartilhado.
 6. Inicie com `npm run dev`. A porta padrão é 3000.
 
 O e-mail utiliza `sandbox.smtp.mailtrap.io:2525`: as mensagens são capturadas no Mailtrap, sem entrega real aos usuários.
 
-## Rotas disponíveis
+## Módulo reorganizado
+
+Consulte [o contrato e os testes de usuários](docs/usuarios.md) e [as requisições manuais](docs/usuarios.http). As rotas canônicas são `/api/v1/usuarios` e `/api/v1/auth`; os caminhos antigos continuam temporariamente disponíveis. A listagem agora retorna `{ dados, meta }`; CPF não é retornado pela API. JWT_SECRET deve ter pelo menos 32 bytes.
+
+## Rotas anteriores (aliases temporários)
 
 | Método | Rota | Acesso |
 |---|---|---|
@@ -27,15 +41,15 @@ O e-mail utiliza `sandbox.smtp.mailtrap.io:2525`: as mensagens são capturadas n
 | POST | `/usuarios/recuperar-senha` | Público |
 | POST | `/usuarios/redefinir-senha` | Público; exige código válido |
 
-Nas rotas protegidas, envie `Authorization: Bearer <token>`. O cadastro recebe `nome`, `cpf` (11 dígitos), `email`, `telefone`, `senha` e `perfil` (`ESTUDANTE`, `MOTORISTA` ou `OPERADOR`). A senha exige pelo menos oito caracteres, maiúscula, minúscula, número e símbolo.
+Nas rotas protegidas, envie `Authorization: Bearer <token>`. O cadastro recebe `nome`, `cpf` (11 dígitos), `email`, `telefone`, `senha` e `perfil` (`OPERADOR`). A senha exige pelo menos oito caracteres, maiúscula, minúscula, número e símbolo.
 
 O login recebe `email` e `senha`; a solicitação de recuperação recebe `email`; a redefinição recebe `email`, `codigo` de seis dígitos e `novaSenha`.
 
-**Limitação atual:** novas contas ficam aguardando ativação. O fluxo de ativação e a criação segura do primeiro operador ainda não estão implementados. Um banco vazio não permite iniciar os cadastros pela API. Não existe usuário ou senha padrão; não abra o cadastro administrativo para contornar essa pendência.
+**Limitação atual:** novas contas ficam aguardando ativação. Um operador pode alterar o status de outra conta em `PATCH /api/v1/usuarios/:id/status`; isso não verifica e-mail nem aprova matrícula. O cadastro unificado de estudante em `/api/v1/estudantes` já cria matrícula aprovada e carteira; veja [o contrato](docs/estudantes.md). Para desenvolvimento, `npm run seed:local` prepara o primeiro operador apenas em PostgreSQL local, com credenciais fornecidas pelo desenvolvedor. Provisionamento administrativo de produção ainda precisa ser definido. Não existe senha padrão nem cadastro público de operador.
 
 ## Verificação
 
-- `npm test`: regressões de autenticação/autorização com banco simulado.
+- `npm test`: regressões de autenticação/autorização e viagens com persistência simulada, além de migração SQL em PostgreSQL em memória.
 - `npm run typecheck`: verificação de tipos após gerar o Prisma Client.
 - `npm run prisma:validate`: validação do schema.
 - `npm audit`: relatório atual de dependências.
@@ -43,3 +57,13 @@ O login recebe `email` e `senha`; a solicitação de recuperação recebe `email
 Essas verificações não substituem testes com banco e SMTP reais.
 
 Veja também [as dependências](docs/dependencias.md). Versione schema, migrações e `package-lock.json`; mantenha credenciais, `node_modules`, cliente gerado e logs fora do Git.
+
+O cadastro completo de motorista usa /api/v1/motoristas, incluindo CNH e conta já ativa. Consulte [cadastro de motoristas](docs/motoristas.md) para complemento de contas existentes, edição e desativação com histórico.
+
+A gestão de veículos usa /api/v1/veiculos, restrita a operadores. Consulte [cadastro de veículos](docs/veiculos.md) para os contratos, histórico e regras de desativação.
+
+Os cadastros de instituições, unidades e pontos usam /api/v1/instituicoes, /api/v1/unidades-ensino e /api/v1/pontos-parada. Consulte [cadastros de ensino](docs/ensino.md) para vínculos, histórico e desativação.
+
+O painel web do operador fica no projeto irmão `operador-front-end`, em Next.js, na porta 3001. Com este back-end iniciado na porta 3000, execute `npm ci` e `npm run dev` na pasta do front-end e entre com um operador ativo existente. As chamadas são encaminhadas por proxy local para `/api/v1`, sem precisar abrir CORS. As escalas semanais são administradas em `/api/v1/escalas`; consulte [o contrato de escalas](docs/escalas.md). Nenhuma migração adicional é necessária para o painel.
+
+Rotas e cidades são administradas em /api/v1/rotas e /api/v1/cidades. Consulte [catálogos](docs/catalogos.md) para a revisão obrigatória de rascunhos e a preservação de vínculos após desativação.

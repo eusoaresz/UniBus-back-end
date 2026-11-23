@@ -25,6 +25,7 @@ enum StatusCadastroEstudante {
   APROVADO
   REJEITADO
   SUSPENSO
+  ENCERRADO
 }
 
 enum TipoInstituicao {
@@ -74,19 +75,20 @@ enum StatusTrecho {
   CANCELADO
 }
 
-enum TipoAtendimento {
-  PRINCIPAL
-  RESERVA
+enum AlocacaoVeiculo {
+  VEICULO
+  EXTRA
 }
 
-enum StatusAtendimento {
-  CONFIRMADO
-  EM_ANDAMENTO
-  CONCLUIDO
-  CANCELADO
+enum OrigemConfirmacao {
+  ESTUDANTE
+  AUTOMATICA
+  OPERADOR
 }
 
 enum StatusParticipacao {
+  EM_ESPERA
+  EXPIRADA
   CONFIRMADA
   CANCELADA
 }
@@ -116,8 +118,13 @@ enum StatusRecarga {
 
 enum TipoMovimentacao {
   RECARGA
-  COBRANCA_EMBARQUE
+  COBRANCA_CONFIRMACAO
   ESTORNO
+}
+
+enum CategoriaAviso {
+  GERAL
+  VIAGENS
 }
 
 enum StatusIndisponibilidade {
@@ -146,6 +153,8 @@ enum StatusEntrega {
 }
 
 enum AcaoParticipacao {
+  ENTRADA_FILA
+  EXPIRACAO
   CONFIRMACAO
   CANCELAMENTO
   ALTERACAO_PONTOS
@@ -160,13 +169,17 @@ model Usuario {
   nome                    String
   cpf                     String        @unique @db.VarChar(11)
   email                   String        @unique
+  dataNascimento          DateTime? @db.Date
+  fotoChave               String? @db.VarChar(36)
   telefone                String
   senhaHash               String?
   deveAlterarSenha        Boolean       @default(true)
   senhaTemporariaExpiraEm DateTime?     @db.Timestamptz(3)
   perfil                  PerfilUsuario
   status                  StatusConta   @default(AGUARDANDO_ATIVACAO)
+  bloqueioDisciplinarAte   DateTime? @db.Timestamptz(3)
   emailVerificadoEm       DateTime?     @db.Timestamptz(3)
+  tokensRevogadosAte      DateTime?     @db.Timestamptz(3)
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -177,8 +190,16 @@ model Usuario {
   usuariosCadastrados Usuario[] @relation("CadastroUsuario")
 
   tokensAcesso TokenAcesso[]
+  tokensRevogados TokenRevogado[]
 
   estudante Estudante?
+  preferencias Preferencias?
+  alteracoesPerfil AlteracaoPerfil[] @relation("AlvoPerfil")
+  alteracoesPerfilRealizadas AlteracaoPerfil[] @relation("AutorPerfil")
+  alteracoesVeiculoRealizadas AlteracaoVeiculo[]
+  alteracoesEnsinoRealizadas AlteracaoEnsino[]
+  alteracoesCatalogoRealizadas AlteracaoCatalogo[]
+  alteracoesAvisoRealizadas AlteracaoAviso[]
 
   estudantesAnalisados Estudante[] @relation("AnaliseEstudante")
 
@@ -192,9 +213,13 @@ model Usuario {
 
   trechosCancelados TrechoViagem[] @relation("CancelamentoTrecho")
 
-  alteracoesAtendimento AlteracaoAtendimento[]
+  alteracoesTrecho AlteracaoTrecho[]
 
-  reservasSolicitadas SolicitacaoReserva[]
+  reservasAtendidas SolicitacaoReserva[] @relation("AtendimentoReserva")
+
+  confirmacoesOperadas ParticipacaoTrecho[] @relation("ConfirmacaoOperador")
+
+  reservasSolicitadas SolicitacaoReserva[] @relation("SolicitacaoReserva")
 
   alteracoesParticipacao AlteracaoParticipacao[]
 
@@ -203,6 +228,8 @@ model Usuario {
   embarquesEstornados Embarque[] @relation("EstornoEmbarque")
 
   recargasAnalisadas Recarga[]
+
+  recargasSolicitadas Recarga[] @relation("SolicitacaoRecarga")
 
   movimentacoesRealizadas MovimentacaoCarteira[]
 
@@ -213,6 +240,12 @@ model Usuario {
   dispositivos DispositivoUsuario[]
 
   notificacoes Notificacao[]
+  preferenciasNotificacao PreferenciasNotificacao?
+
+  semestresCriados SemestreLetivo[]
+  faltasAnalisadas Falta[] @relation("AnaliseFalta")
+  advertenciasLiberadas Advertencia[] @relation("LiberacaoAdvertencia")
+  convocacoesCriadas ConvocacaoVan[]
 
   @@index([cadastradoPorId])
 }
@@ -234,9 +267,22 @@ model TokenAcesso {
   @@index([usuarioId])
 }
 
+model TokenRevogado {
+  tokenHash String @id @db.VarChar(64)
+  usuarioId String @db.Uuid
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  expiraEm DateTime @db.Timestamptz(3)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([expiraEm])
+  @@index([usuarioId])
+}
+
 model Estudante {
   id String @id @default(uuid()) @db.Uuid
 
+  curso             String? @db.VarChar(150)
+  cidadeOrigemId    String? @db.Uuid
+  cidadeOrigem      Cidade? @relation(fields: [cidadeOrigemId], references: [id], onDelete: Restrict)
   matricula         String
   previsaoConclusao DateTime                @db.Date
   statusCadastro    StatusCadastroEstudante @default(PENDENTE)
@@ -259,8 +305,12 @@ model Estudante {
 
   participacoes ParticipacaoTrecho[]
 
+  faltas Falta[]
+  advertencias Advertencia[]
+
   carteira Carteira?
 
+  @@unique([unidadeEnsinoId, matricula])
   @@index([statusCadastro])
   @@index([unidadeEnsinoId])
   @@index([analisadoPorId])
@@ -279,13 +329,24 @@ model Motorista {
   usuarioId String  @unique @db.Uuid
   usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
 
+  convocacoes ConvocacaoVan[]
+
   escalas EscalaSemanal[]
 
-  atendimentos AtendimentoTrecho[]
+  trechos TrechoViagem[] @relation("MotoristaTrecho")
+
+  trechosExtras TrechoViagem[] @relation("MotoristaExtraTrecho")
 
   embarques Embarque[]
 
   indisponibilidades IndisponibilidadeMotorista[]
+}
+
+// Bytes de fotos e comprovantes. Ficam no banco porque o disco do servidor (Render) é apagado a cada reinício.
+model ArquivoPrivado {
+  chave    String   @id @db.Uuid
+  conteudo Bytes
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model ComprovanteMatricula {
@@ -320,6 +381,7 @@ model InstituicaoEnsino {
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 
   unidades UnidadeEnsino[]
+  alteracoes AlteracaoEnsino[]
 }
 
 model UnidadeEnsino {
@@ -333,6 +395,7 @@ model UnidadeEnsino {
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 
   estudantes Estudante[]
+  alteracoes AlteracaoEnsino[]
 
   instituicaoEnsinoId String            @db.Uuid
   instituicaoEnsino   InstituicaoEnsino @relation(fields: [instituicaoEnsinoId], references: [id], onDelete: Restrict)
@@ -357,6 +420,7 @@ model PontoParada {
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 
   unidadeEnsino UnidadeEnsino?
+  alteracoes AlteracaoEnsino[]
 
   rotas RotaParada[]
 
@@ -378,6 +442,48 @@ model Rota {
   escalas EscalaSemanal[]
 
   viagens Viagem[]
+  preferencias PreferenciaRota[]
+  alteracoes AlteracaoCatalogo[]
+}
+
+model Cidade {
+  id String @id @default(uuid()) @db.Uuid
+  nome String @unique
+  ativa Boolean @default(true)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+  preferencias PreferenciaCidade[]
+  estudantesOrigem Estudante[]
+  alteracoes AlteracaoCatalogo[]
+}
+
+model Preferencias {
+  id String @id @default(uuid()) @db.Uuid
+  usuarioId String @unique @db.Uuid
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  turnos Turno[] @default([])
+  rotas PreferenciaRota[]
+  cidades PreferenciaCidade[]
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model PreferenciaRota {
+  preferenciasId String @db.Uuid
+  rotaId String @db.Uuid
+  preferencias Preferencias @relation(fields: [preferenciasId], references: [id], onDelete: Cascade)
+  rota Rota @relation(fields: [rotaId], references: [id], onDelete: Cascade)
+  @@id([preferenciasId, rotaId])
+  @@index([rotaId])
+}
+
+model PreferenciaCidade {
+  preferenciasId String @db.Uuid
+  cidadeId String @db.Uuid
+  preferencias Preferencias @relation(fields: [preferenciasId], references: [id], onDelete: Cascade)
+  cidade Cidade @relation(fields: [cidadeId], references: [id], onDelete: Restrict)
+  @@id([preferenciasId, cidadeId])
+  @@index([cidadeId])
 }
 
 model RotaParada {
@@ -414,9 +520,28 @@ model Veiculo {
 
   escalas EscalaSemanal[]
 
-  atendimentos AtendimentoTrecho[]
+  convocacoes ConvocacaoVan[]
+
+  trechos TrechoViagem[] @relation("VeiculoTrecho")
+
+  trechosExtras TrechoViagem[] @relation("VeiculoExtraTrecho")
 
   embarques Embarque[]
+  alteracoes AlteracaoVeiculo[]
+}
+
+model AlteracaoVeiculo {
+  id String @id @default(uuid()) @db.Uuid
+  veiculoId String @db.Uuid
+  veiculo Veiculo @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
+  realizadaPorId String @db.Uuid
+  realizadaPor Usuario @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  motivo String
+  dadosAnteriores Json
+  dadosNovos Json
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([veiculoId, criadoEm])
+  @@index([realizadaPorId])
 }
 
 model EscalaSemanal {
@@ -434,7 +559,6 @@ model EscalaSemanal {
   antecedenciaCancelamentoIdaMin   Int?
   antecedenciaConfirmacaoVoltaMin  Int?
   antecedenciaCancelamentoVoltaMin Int?
-  percentualVagasLivresReserva     Int       @default(10)
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -459,13 +583,13 @@ model EscalaSemanal {
 model Viagem {
   id String @id @default(uuid()) @db.Uuid
 
-  data                   DateTime     @db.Date
-  turno                  Turno
-  nomeRota               String
-  status                 StatusViagem @default(RASCUNHO)
-  chegadaPedroPrevistaEm DateTime?    @db.Timestamptz(3)
-  canceladaEm            DateTime?    @db.Timestamptz(3)
-  motivoCancelamento     String?
+  data               DateTime     @db.Date
+  turno              Turno
+  nomeRota           String
+  revisaoRotaPendente Boolean @default(false)
+  status             StatusViagem @default(RASCUNHO)
+  canceladaEm        DateTime?    @db.Timestamptz(3)
+  motivoCancelamento String?
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -494,17 +618,29 @@ model Viagem {
 model TrechoViagem {
   id String @id @default(uuid()) @db.Uuid
 
-  sentido                      SentidoTrecho
-  status                       StatusTrecho  @default(RASCUNHO)
-  saidaPrevistaEm              DateTime?     @db.Timestamptz(3)
-  limiteConfirmacaoEm          DateTime?     @db.Timestamptz(3)
-  limiteCancelamentoEm         DateTime?     @db.Timestamptz(3)
-  iniciadoEm                   DateTime?     @db.Timestamptz(3)
-  concluidoEm                  DateTime?     @db.Timestamptz(3)
-  tarifaCentavos               Int           @default(200)
-  percentualVagasLivresReserva Int           @default(10)
-  canceladoEm                  DateTime?     @db.Timestamptz(3)
-  motivoCancelamento           String?
+  sentido              SentidoTrecho
+  status               StatusTrecho  @default(RASCUNHO)
+  saidaPrevistaEm      DateTime      @db.Timestamptz(3)
+  limiteConfirmacaoEm  DateTime      @db.Timestamptz(3)
+  limiteCancelamentoEm DateTime      @db.Timestamptz(3)
+  iniciadoEm           DateTime?     @db.Timestamptz(3)
+  concluidoEm          DateTime?     @db.Timestamptz(3)
+  tarifa               Decimal       @default(2.00) @db.Decimal(10, 2)
+  chegadaPrevistaEm    DateTime      @db.Timestamptz(3)
+  capacidade           Int?
+  capacidadeExtra      Int?
+  inscricoesSuspensas  Boolean       @default(false)
+
+  motoristaId        String?    @db.Uuid
+  motorista          Motorista? @relation("MotoristaTrecho", fields: [motoristaId], references: [id], onDelete: Restrict)
+  motoristaExtraId   String?    @db.Uuid
+  motoristaExtra     Motorista? @relation("MotoristaExtraTrecho", fields: [motoristaExtraId], references: [id], onDelete: Restrict)
+  veiculoId          String?    @db.Uuid
+  veiculo            Veiculo?   @relation("VeiculoTrecho", fields: [veiculoId], references: [id], onDelete: Restrict)
+  veiculoExtraId     String?    @db.Uuid
+  veiculoExtra       Veiculo?   @relation("VeiculoExtraTrecho", fields: [veiculoExtraId], references: [id], onDelete: Restrict)
+  canceladoEm        DateTime?  @db.Timestamptz(3)
+  motivoCancelamento String?
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -515,15 +651,23 @@ model TrechoViagem {
   canceladoPorId String?  @db.Uuid
   canceladoPor   Usuario? @relation("CancelamentoTrecho", fields: [canceladoPorId], references: [id], onDelete: Restrict)
 
+  convocacoes ConvocacaoVan[]
+
   paradas ParadaTrecho[]
 
-  atendimentos AtendimentoTrecho[]
+  alteracoes AlteracaoTrecho[]
+
+  indisponibilidades IndisponibilidadeMotorista[]
 
   solicitacoesReserva SolicitacaoReserva[]
 
   participacoes ParticipacaoTrecho[]
 
   @@unique([viagemId, sentido])
+  @@index([motoristaId])
+  @@index([motoristaExtraId])
+  @@index([veiculoId])
+  @@index([veiculoExtraId])
   @@index([status, saidaPrevistaEm])
   @@index([viagemId])
   @@index([canceladoPorId])
@@ -532,6 +676,8 @@ model TrechoViagem {
 model ParadaTrecho {
   id String @id @default(uuid()) @db.Uuid
 
+  versao     Int     @default(1)
+  ativa      Boolean @default(true)
   ordem      Int
   nome       String
   cidade     String
@@ -551,50 +697,13 @@ model ParadaTrecho {
 
   desembarquesPrevistos ParticipacaoTrecho[] @relation("DestinoParticipacao")
 
-  @@unique([trechoId, pontoParadaId])
-  @@unique([trechoId, ordem])
+  @@unique([trechoId, versao, pontoParadaId])
+  @@unique([trechoId, versao, ordem])
   @@index([trechoId])
   @@index([pontoParadaId])
 }
 
-model AtendimentoTrecho {
-  id String @id @default(uuid()) @db.Uuid
-
-  tipo       TipoAtendimento
-  status     StatusAtendimento @default(CONFIRMADO)
-  prioridade Int
-  capacidade Int
-
-  criadoEm     DateTime @default(now()) @db.Timestamptz(3)
-  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
-
-  trechoId String       @db.Uuid
-  trecho   TrechoViagem @relation(fields: [trechoId], references: [id], onDelete: Restrict)
-
-  veiculoId String  @db.Uuid
-  veiculo   Veiculo @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
-
-  motoristaId String    @db.Uuid
-  motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
-
-  solicitacaoReservaId String?             @unique @db.Uuid
-  solicitacaoReserva   SolicitacaoReserva? @relation(fields: [solicitacaoReservaId], references: [id], onDelete: Restrict)
-
-  alteracoes AlteracaoAtendimento[]
-
-  participacoes ParticipacaoTrecho[]
-
-  embarques Embarque[]
-
-  indisponibilidades IndisponibilidadeMotorista[]
-
-  @@unique([trechoId, prioridade])
-  @@index([trechoId])
-  @@index([veiculoId])
-  @@index([motoristaId])
-}
-
-model AlteracaoAtendimento {
+model AlteracaoTrecho {
   id String @id @default(uuid()) @db.Uuid
 
   motivo          String
@@ -604,13 +713,14 @@ model AlteracaoAtendimento {
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 
-  atendimentoId String            @db.Uuid
-  atendimento   AtendimentoTrecho @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  trechoId String           @db.Uuid
+  trecho   TrechoViagem     @relation(fields: [trechoId], references: [id], onDelete: Restrict)
+  alocacao AlocacaoVeiculo?
 
-  realizadaPorId String  @db.Uuid
-  realizadaPor   Usuario @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  realizadaPorId String?  @db.Uuid
+  realizadaPor   Usuario? @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
 
-  @@index([atendimentoId])
+  @@index([trechoId])
   @@index([realizadaPorId])
 }
 
@@ -623,14 +733,17 @@ model SolicitacaoReserva {
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 
-  atendimento AtendimentoTrecho?
+  atendidaEm    DateTime? @db.Timestamptz(3)
+  atendidaPorId String?   @db.Uuid
+  atendidaPor   Usuario?  @relation("AtendimentoReserva", fields: [atendidaPorId], references: [id], onDelete: Restrict)
 
   trechoId String       @db.Uuid
   trecho   TrechoViagem @relation(fields: [trechoId], references: [id], onDelete: Restrict)
 
   solicitadaPorId String  @db.Uuid
-  solicitadaPor   Usuario @relation(fields: [solicitadaPorId], references: [id], onDelete: Restrict)
+  solicitadaPor   Usuario @relation("SolicitacaoReserva", fields: [solicitadaPorId], references: [id], onDelete: Restrict)
 
+  @@index([atendidaPorId])
   @@index([trechoId])
   @@index([solicitadaPorId])
 }
@@ -638,8 +751,8 @@ model SolicitacaoReserva {
 model ParticipacaoTrecho {
   id String @id @default(uuid()) @db.Uuid
 
-  status       StatusParticipacao @default(CONFIRMADA)
-  confirmadaEm DateTime           @default(now()) @db.Timestamptz(3)
+  status       StatusParticipacao @default(EM_ESPERA)
+  confirmadaEm DateTime?          @db.Timestamptz(3)
   canceladaEm  DateTime?          @db.Timestamptz(3)
   ordemFila    BigInt             @unique @default(autoincrement())
 
@@ -658,10 +771,19 @@ model ParticipacaoTrecho {
   destinoId String       @db.Uuid
   destino   ParadaTrecho @relation("DestinoParticipacao", fields: [destinoId], references: [id], onDelete: Restrict)
 
-  atendimentoId String?            @db.Uuid
-  atendimento   AtendimentoTrecho? @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  alocacao          AlocacaoVeiculo?
+  origemConfirmacao OrigemConfirmacao?
+  confirmadaPorId   String?                @db.Uuid
+  confirmadaPor     Usuario?               @relation("ConfirmacaoOperador", fields: [confirmadaPorId], references: [id], onDelete: Restrict)
+  motivoExcecao     String?
+  confirmacaoTardia Boolean @default(false)
+  limiteEstornoEm   DateTime?              @db.Timestamptz(3)
+  cicloConfirmacao  Int                    @default(0)
+  movimentacoes     MovimentacaoCarteira[]
 
   alteracoes AlteracaoParticipacao[]
+
+  falta Falta?
 
   embarques Embarque[]
 
@@ -671,7 +793,7 @@ model ParticipacaoTrecho {
   @@index([estudanteId])
   @@index([origemId])
   @@index([destinoId])
-  @@index([atendimentoId])
+  @@index([confirmadaPorId])
 }
 
 model AlteracaoParticipacao {
@@ -713,9 +835,6 @@ model Embarque {
   participacaoId String             @db.Uuid
   participacao   ParticipacaoTrecho @relation(fields: [participacaoId], references: [id], onDelete: Restrict)
 
-  atendimentoId String            @db.Uuid
-  atendimento   AtendimentoTrecho @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
-
   registradoPorId String  @db.Uuid
   registradoPor   Usuario @relation("RegistroEmbarque", fields: [registradoPorId], references: [id], onDelete: Restrict)
 
@@ -731,7 +850,6 @@ model Embarque {
   cobranca MovimentacaoCarteira?
 
   @@index([participacaoId])
-  @@index([atendimentoId])
   @@index([registradoPorId])
   @@index([estornadoPorId])
   @@index([motoristaId])
@@ -741,9 +859,9 @@ model Embarque {
 model Carteira {
   id String @id @default(uuid()) @db.Uuid
 
-  saldoCentavos         Int @default(0)
-  limiteCreditoCentavos Int @default(2000)
-  versao                Int @default(0)
+  saldo         Decimal @default(0.00) @db.Decimal(10, 2)
+  limiteCredito Decimal @default(20.00) @db.Decimal(10, 2)
+  versao        Int     @default(0)
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -759,7 +877,7 @@ model Carteira {
 model Recarga {
   id String @id @default(uuid()) @db.Uuid
 
-  valorCentavos          Int
+  valor                  Decimal        @db.Decimal(10, 2)
   formaPagamento         FormaPagamento
   status                 StatusRecarga  @default(PENDENTE)
   analisadaEm            DateTime?      @db.Timestamptz(3)
@@ -777,7 +895,12 @@ model Recarga {
   analisadaPor   Usuario? @relation(fields: [analisadaPorId], references: [id], onDelete: Restrict)
 
   credito MovimentacaoCarteira?
+  pagamento Pagamento?
 
+  solicitadaPorId String?  @db.Uuid
+  solicitadaPor   Usuario? @relation("SolicitacaoRecarga", fields: [solicitadaPorId], references: [id], onDelete: Restrict)
+
+  @@index([solicitadaPorId])
   @@index([carteiraId, status])
   @@index([carteiraId])
   @@index([analisadaPorId])
@@ -787,13 +910,17 @@ model MovimentacaoCarteira {
   id String @id @default(uuid()) @db.Uuid
 
   tipo              TipoMovimentacao
-  valorCentavos     Int
-  saldoAposCentavos Int
+  valor             Decimal          @db.Decimal(10, 2)
+  saldoApos         Decimal          @db.Decimal(10, 2)
   chaveIdempotencia String           @unique
   motivo            String?
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+
+  participacaoId   String?             @db.Uuid
+  participacao     ParticipacaoTrecho? @relation(fields: [participacaoId], references: [id], onDelete: Restrict)
+  cicloConfirmacao Int?
 
   carteiraId String   @db.Uuid
   carteira   Carteira @relation(fields: [carteiraId], references: [id], onDelete: Restrict)
@@ -809,12 +936,29 @@ model MovimentacaoCarteira {
 
   estorno MovimentacaoCarteira? @relation("EstornoMovimentacao")
 
-  realizadaPorId String  @db.Uuid
-  realizadaPor   Usuario @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  realizadaPorId String? @db.Uuid
+  realizadaPor   Usuario? @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
 
+  @@unique([participacaoId, cicloConfirmacao, tipo])
   @@index([carteiraId, criadoEm])
   @@index([carteiraId])
   @@index([realizadaPorId])
+}
+
+model Pagamento {
+  recargaId String @id @db.Uuid
+  recarga Recarga @relation(fields: [recargaId], references: [id], onDelete: Restrict)
+  provedor String @default("STRIPE")
+  ambiente String
+  referencia String? @unique
+  chaveCriacao String @unique @default(uuid()) @db.Uuid
+  status String @default("CRIANDO")
+  revisaoNecessaria Boolean @default(false)
+  motivoRevisao String?
+  proximaConsultaEm DateTime @default(now()) @db.Timestamptz(3)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
+  @@index([status, proximaConsultaEm])
 }
 
 model IndisponibilidadeMotorista {
@@ -828,8 +972,9 @@ model IndisponibilidadeMotorista {
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 
-  atendimentoId String            @db.Uuid
-  atendimento   AtendimentoTrecho @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  trechoId String           @db.Uuid
+  trecho   TrechoViagem     @relation(fields: [trechoId], references: [id], onDelete: Restrict)
+  alocacao AlocacaoVeiculo?
 
   motoristaId String    @db.Uuid
   motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
@@ -838,19 +983,23 @@ model IndisponibilidadeMotorista {
   resolvidaPor   Usuario? @relation(fields: [resolvidaPorId], references: [id], onDelete: Restrict)
 
   @@index([status])
-  @@index([atendimentoId])
+  @@index([trechoId])
   @@index([motoristaId])
   @@index([resolvidaPorId])
 }
 
 model Aviso {
+  alteracoes AlteracaoAviso[]
   id String @id @default(uuid()) @db.Uuid
 
   titulo        String
   mensagem      String
+  categoria     CategoriaAviso @default(GERAL)
+  importante    Boolean        @default(false)
+  ativo         Boolean        @default(true)
   publicoPerfil PerfilUsuario?
   publicadoEm   DateTime       @default(now()) @db.Timestamptz(3)
-  expiraEm      DateTime?      @db.Timestamptz(3)
+  expiraEm       DateTime?       @db.Timestamptz(3)
 
   criadoEm     DateTime @default(now()) @db.Timestamptz(3)
   atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
@@ -861,12 +1010,18 @@ model Aviso {
   notificacoes Notificacao[]
 
   @@index([publicadoPorId])
+  @@index([ativo, publicadoEm])
 }
 
 model DispositivoUsuario {
   id String @id @default(uuid()) @db.Uuid
 
-  expoPushToken String  @unique
+  expoPushToken String? @unique
+  webEndpoint String? @unique
+  webP256dh String?
+  webAuth String?
+  sessaoHash String?
+  expiraEm DateTime? @db.Timestamptz(3)
   plataforma    String
   ativo         Boolean @default(true)
 
@@ -885,6 +1040,8 @@ model Notificacao {
   id String @id @default(uuid()) @db.Uuid
 
   tipo              String
+  tema              String @default("OPERACAO") @db.VarChar(32)
+  alertaHabilitado   Boolean @default(true)
   titulo            String
   mensagem          String
   dados             Json?
@@ -903,8 +1060,25 @@ model Notificacao {
   entregas EntregaNotificacao[]
 
   @@index([usuarioId, criadoEm])
+  @@index([usuarioId, alertaHabilitado, lidaEm])
   @@index([usuarioId])
   @@index([avisoId])
+}
+
+model PreferenciasNotificacao {
+  usuarioId String @id @db.Uuid
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  ativadas Boolean @default(true)
+  confirmacoes Boolean @default(true)
+  alteracoesRota Boolean @default(true)
+  cancelamentos Boolean @default(true)
+  lembretes Boolean @default(true)
+  avisosOperador Boolean @default(true)
+  novidades Boolean @default(true)
+  carteira Boolean @default(true)
+  disciplina Boolean @default(true)
+  operacao Boolean @default(true)
+  atualizadoEm DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model EntregaNotificacao {
@@ -934,4 +1108,143 @@ model EntregaNotificacao {
   @@index([status, agendadaPara])
   @@index([notificacaoId])
   @@index([dispositivoId])
+}
+
+
+model SemestreLetivo {
+  id String @id @default(uuid()) @db.Uuid
+  nome String
+  inicio DateTime @db.Timestamptz(3)
+  fim DateTime @db.Timestamptz(3)
+  criadoPorId String @db.Uuid
+  criadoPor Usuario @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  faltas Falta[]
+  advertencias Advertencia[]
+  @@index([inicio, fim])
+}
+
+model Falta {
+  id String @id @default(uuid()) @db.Uuid
+  participacaoId String @unique @db.Uuid
+  participacao ParticipacaoTrecho @relation(fields: [participacaoId], references: [id], onDelete: Restrict)
+  estudanteId String @db.Uuid
+  estudante Estudante @relation(fields: [estudanteId], references: [id], onDelete: Restrict)
+  semestreId String @db.Uuid
+  semestre SemestreLetivo @relation(fields: [semestreId], references: [id], onDelete: Restrict)
+  justificativa String?
+  justificada Boolean @default(false)
+  analisadoEm DateTime? @db.Timestamptz(3)
+  analisadoPorId String? @db.Uuid
+  analisadoPor Usuario? @relation("AnaliseFalta", fields: [analisadoPorId], references: [id], onDelete: Restrict)
+  motivoAnalise String?
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([estudanteId, semestreId, justificada])
+}
+
+model Advertencia {
+  id String @id @default(uuid()) @db.Uuid
+  estudanteId String @db.Uuid
+  estudante Estudante @relation(fields: [estudanteId], references: [id], onDelete: Restrict)
+  semestreId String @db.Uuid
+  semestre SemestreLetivo @relation(fields: [semestreId], references: [id], onDelete: Restrict)
+  numero Int
+  liberadaEm DateTime? @db.Timestamptz(3)
+  motivoLiberacao String?
+  liberadaPorId String? @db.Uuid
+  liberadaPor Usuario? @relation("LiberacaoAdvertencia", fields: [liberadaPorId], references: [id], onDelete: Restrict)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([estudanteId, semestreId, numero])
+}
+
+enum StatusConvocacaoVan {
+  PENDENTE
+  ACEITA
+  RECUSADA
+  EXPIRADA
+  CANCELADA
+}
+
+model ConvocacaoVan {
+  id String @id @default(uuid()) @db.Uuid
+  trechoId String @db.Uuid
+  trecho TrechoViagem @relation(fields: [trechoId], references: [id], onDelete: Restrict)
+  motoristaId String @db.Uuid
+  motorista Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
+  veiculoId String @db.Uuid
+  veiculo Veiculo @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
+  solicitadaPorId String @db.Uuid
+  solicitadaPor Usuario @relation(fields: [solicitadaPorId], references: [id], onDelete: Restrict)
+  status StatusConvocacaoVan @default(PENDENTE)
+  responderAte DateTime @db.Timestamptz(3)
+  respondidaEm DateTime? @db.Timestamptz(3)
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([trechoId, status])
+  @@index([motoristaId, status])
+}
+
+
+model AlteracaoPerfil {
+  id String @id @default(uuid()) @db.Uuid
+  usuarioId String @db.Uuid
+  usuario Usuario @relation("AlvoPerfil", fields: [usuarioId], references: [id], onDelete: Restrict)
+  realizadaPorId String @db.Uuid
+  realizadaPor Usuario @relation("AutorPerfil", fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  motivo String
+  dadosAnteriores Json
+  dadosNovos Json
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([usuarioId, criadoEm])
+  @@index([realizadaPorId])
+}
+
+model AlteracaoEnsino {
+  id String @id @default(uuid()) @db.Uuid
+  instituicaoEnsinoId String? @db.Uuid
+  instituicaoEnsino InstituicaoEnsino? @relation(fields: [instituicaoEnsinoId], references: [id], onDelete: Restrict)
+  unidadeEnsinoId String? @db.Uuid
+  unidadeEnsino UnidadeEnsino? @relation(fields: [unidadeEnsinoId], references: [id], onDelete: Restrict)
+  pontoParadaId String? @db.Uuid
+  pontoParada PontoParada? @relation(fields: [pontoParadaId], references: [id], onDelete: Restrict)
+  realizadaPorId String @db.Uuid
+  realizadaPor Usuario @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  motivo String
+  dadosAnteriores Json
+  dadosNovos Json
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([instituicaoEnsinoId, criadoEm])
+  @@index([unidadeEnsinoId, criadoEm])
+  @@index([pontoParadaId, criadoEm])
+  @@index([realizadaPorId])
+}
+
+model AlteracaoCatalogo {
+  id String @id @default(uuid()) @db.Uuid
+  rotaId String? @db.Uuid
+  rota Rota? @relation(fields: [rotaId], references: [id], onDelete: Restrict)
+  cidadeId String? @db.Uuid
+  cidade Cidade? @relation(fields: [cidadeId], references: [id], onDelete: Restrict)
+  realizadaPorId String @db.Uuid
+  realizadaPor Usuario @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  motivo String
+  dadosAnteriores Json
+  dadosNovos Json
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([rotaId, criadoEm])
+  @@index([cidadeId, criadoEm])
+  @@index([realizadaPorId])
+}
+
+model AlteracaoAviso {
+  id String @id @default(uuid()) @db.Uuid
+  avisoId String @db.Uuid
+  aviso Aviso @relation(fields: [avisoId], references: [id], onDelete: Restrict)
+  realizadaPorId String @db.Uuid
+  realizadaPor Usuario @relation(fields: [realizadaPorId], references: [id], onDelete: Restrict)
+  motivo String
+  dadosAnteriores Json
+  dadosNovos Json
+  criadoEm DateTime @default(now()) @db.Timestamptz(3)
+  @@index([avisoId, criadoEm])
+  @@index([realizadaPorId])
 }
